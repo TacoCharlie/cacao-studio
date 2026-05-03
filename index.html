@@ -1,0 +1,1847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cacao Studio — Evoke Chocolate</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Libre+Franklin:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --cream:     #F7F2EC;
+  --parchment: #EEE6D8;
+  --ink:       #1C1510;
+  --cocoa:     #5C3D25;
+  --copper:    #A0673A;
+  --gold:      #C9963E;
+  --gold-lt:   #E8C97A;
+  --sage:      #6E8A6C;
+  --muted:     #7A6E64;
+  --border:    rgba(60,40,20,0.14);
+  --border-md: rgba(60,40,20,0.22);
+  --shadow:    0 2px 16px rgba(28,21,16,0.10);
+  --shadow-lg: 0 8px 40px rgba(28,21,16,0.15);
+  --radius:    10px;
+  --radius-lg: 16px;
+  --serif:     'Cormorant Garamond', Georgia, serif;
+  --sans:      'Libre Franklin', system-ui, sans-serif;
+  --t:         0.18s ease;
+  --rating-1:  #A0673A;
+  --rating-2:  #C9963E;
+  --rating-3:  #6E8A6C;
+}
+html { font-size: 15px; }
+body { font-family: var(--sans); background: var(--cream); color: var(--ink); min-height: 100vh; line-height: 1.6; }
+button { cursor: pointer; font-family: var(--sans); border: none; background: none; }
+input, select, textarea { font-family: var(--sans); font-size: 13px; }
+img { display: block; max-width: 100%; }
+a { color: var(--copper); text-decoration: none; }
+a:hover { text-decoration: underline; }
+::-webkit-scrollbar { width: 5px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: var(--border-md); border-radius: 99px; }
+
+/* ── LOGIN ──────────────────────────────────────────────── */
+#login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: var(--ink); }
+.login-box { background: var(--cream); border-radius: var(--radius-lg); padding: 48px 40px; width: min(400px,90vw); box-shadow: var(--shadow-lg); text-align: center; }
+.login-gem { width: 10px; height: 10px; background: var(--gold); border-radius: 50%; box-shadow: 0 0 10px var(--gold); margin: 0 auto 20px; }
+.login-logo { font-family: var(--serif); font-size: 28px; font-weight: 300; letter-spacing: 0.1em; margin-bottom: 6px; }
+.login-sub { font-size: 12px; color: var(--muted); letter-spacing: 0.06em; margin-bottom: 32px; }
+.login-field { margin-bottom: 14px; text-align: left; }
+.login-field label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); display: block; margin-bottom: 5px; }
+.login-field input { width: 100%; padding: 10px 14px; border: 1px solid var(--border-md); border-radius: var(--radius); font-size: 13px; background: #fff; color: var(--ink); outline: none; transition: border-color var(--t); }
+.login-field input:focus { border-color: var(--copper); }
+.login-btn { width: 100%; padding: 12px; background: var(--ink); color: var(--cream); border-radius: var(--radius); font-size: 13px; font-weight: 500; letter-spacing: 0.06em; margin-top: 8px; transition: opacity var(--t); }
+.login-btn:hover { opacity: 0.84; }
+.login-err { font-size: 12px; color: #c0392b; margin-top: 10px; min-height: 18px; }
+.login-toggle { font-size: 12px; color: var(--muted); margin-top: 16px; }
+.login-toggle a { color: var(--copper); cursor: pointer; }
+
+/* ── APP ────────────────────────────────────────────────── */
+#app { display: none; }
+.topnav { position: sticky; top: 0; z-index: 80; display: flex; align-items: center; justify-content: space-between; padding: 0 32px; height: 58px; background: var(--ink); border-bottom: 1px solid rgba(255,255,255,0.06); }
+.brand { font-family: var(--serif); font-size: 20px; font-weight: 300; color: var(--cream); letter-spacing: 0.12em; display: flex; align-items: center; gap: 10px; }
+.brand-gem { width: 8px; height: 8px; background: var(--gold); border-radius: 50%; box-shadow: 0 0 8px var(--gold); }
+.nav-tabs { display: flex; gap: 2px; }
+.nav-tab { padding: 6px 18px; border-radius: 6px; font-size: 12px; letter-spacing: 0.07em; color: rgba(247,242,236,0.45); transition: all var(--t); }
+.nav-tab:hover { color: var(--cream); }
+.nav-tab.active { background: rgba(247,242,236,0.10); color: var(--cream); }
+.nav-right { display: flex; align-items: center; gap: 12px; }
+.nav-user { font-size: 11px; color: rgba(247,242,236,0.4); }
+.nav-signout { font-size: 11px; color: rgba(247,242,236,0.35); padding: 4px 10px; border: 1px solid rgba(255,255,255,0.12); border-radius: 5px; transition: all var(--t); }
+.nav-signout:hover { color: var(--cream); border-color: rgba(255,255,255,0.3); }
+.loading-bar { height: 2px; background: var(--gold); position: fixed; top: 0; left: 0; z-index: 999; transition: width .3s ease; }
+.toast { position: fixed; bottom: 24px; right: 24px; background: var(--ink); color: var(--cream); padding: 10px 18px; border-radius: var(--radius); font-size: 12px; z-index: 999; opacity: 0; transition: opacity .3s; pointer-events: none; }
+.toast.show { opacity: 1; }
+
+/* ── PAGES ──────────────────────────────────────────────── */
+.page { display: none; padding: 32px; max-width: 1200px; margin: 0 auto; }
+.page.active { display: block; }
+.page-head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 28px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+.page-head-title { font-family: var(--serif); font-size: 32px; font-weight: 300; font-style: italic; }
+.page-head-sub { font-size: 12px; color: var(--muted); margin-top: 4px; letter-spacing: 0.04em; }
+
+/* ── BUTTONS ────────────────────────────────────────────── */
+.btn-primary { display: inline-flex; align-items: center; gap: 6px; padding: 9px 20px; background: var(--ink); color: var(--cream); border-radius: var(--radius); font-size: 12px; font-weight: 500; letter-spacing: 0.06em; transition: opacity var(--t); }
+.btn-primary:hover { opacity: 0.82; }
+.btn-ghost { display: inline-flex; align-items: center; gap: 6px; padding: 7px 16px; border: 1px solid var(--border-md); border-radius: var(--radius); font-size: 12px; color: var(--cocoa); transition: all var(--t); }
+.btn-ghost:hover { background: var(--parchment); }
+
+/* ── STATS ──────────────────────────────────────────────── */
+.stats-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 28px; }
+.stat-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; }
+.stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 5px; }
+.stat-value { font-family: var(--serif); font-size: 26px; font-weight: 300; }
+
+/* ── FILTERS ────────────────────────────────────────────── */
+.filter-row { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; align-items: center; }
+.filter-chip { padding: 5px 14px; border: 1px solid var(--border-md); border-radius: 999px; font-size: 11px; color: var(--muted); background: #fff; transition: all var(--t); }
+.filter-chip:hover { border-color: var(--cocoa); color: var(--cocoa); }
+.filter-chip.active { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+.search-input { flex: 1; min-width: 180px; padding: 7px 14px; border: 1px solid var(--border-md); border-radius: var(--radius); font-size: 12px; background: #fff; color: var(--ink); outline: none; transition: border-color var(--t); }
+.search-input:focus { border-color: var(--copper); }
+
+/* ── PACK GRID ──────────────────────────────────────────── */
+.pack-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px,1fr)); gap: 18px; }
+.pack-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; cursor: pointer; transition: transform var(--t), box-shadow var(--t); }
+.pack-card:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
+.pack-thumb { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; }
+.pack-thumb-placeholder { width: 100%; aspect-ratio: 4/3; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-size: 13px; letter-spacing: 0.1em; color: rgba(247,242,236,0.8); padding: 16px; text-align: center; line-height: 1.3; }
+.pack-card-body { padding: 13px 15px 15px; }
+.pack-card-name { font-family: var(--serif); font-size: 15px; font-weight: 400; color: var(--ink); margin-bottom: 2px; line-height: 1.25; }
+.pack-card-desc { font-size: 11px; color: var(--muted); margin-bottom: 10px; line-height: 1.4; }
+.swatches { display: flex; gap: 4px; margin-bottom: 9px; }
+.swatch { width: 16px; height: 16px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.08); flex-shrink: 0; }
+
+/* TAG RATING STRIP ON CARD */
+.tag-rating-strip { display: flex; flex-wrap: wrap; gap: 4px; }
+.tag-rating-pill { padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px; }
+.tag-rating-pill.r1 { background: #F5EDE4; color: #7A4A2A; }
+.tag-rating-pill.r2 { background: #FDF3E0; color: #7A4E0A; }
+.tag-rating-pill.r3 { background: #EAF2E8; color: #2E5A28; }
+.tag-rating-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+.r1 .tag-rating-dot { background: var(--rating-1); }
+.r2 .tag-rating-dot { background: var(--rating-2); }
+.r3 .tag-rating-dot { background: var(--rating-3); }
+
+/* ── EMPTY STATE ────────────────────────────────────────── */
+.empty-state { grid-column: 1/-1; text-align: center; padding: 80px 20px; }
+.empty-state-title { font-family: var(--serif); font-size: 22px; font-weight: 300; font-style: italic; color: var(--cocoa); margin-bottom: 8px; }
+.empty-state-sub { font-size: 12px; color: var(--muted); line-height: 1.7; max-width: 280px; margin: 0 auto; }
+
+/* ── OVERLAYS ───────────────────────────────────────────── */
+.overlay { display: none; position: fixed; inset: 0; background: rgba(28,21,16,0.6); z-index: 200; align-items: flex-start; justify-content: center; padding: 32px 16px; overflow-y: auto; }
+.overlay.open { display: flex; }
+
+/* ── DETAIL PANEL ───────────────────────────────────────── */
+.detail-panel { background: var(--cream); border-radius: var(--radius-lg); width: min(820px,96vw); margin: auto; box-shadow: var(--shadow-lg); overflow: hidden; }
+.detail-topbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 22px; background: var(--ink); }
+.detail-topbar-label { font-size: 11px; letter-spacing: 0.1em; color: rgba(247,242,236,0.5); text-transform: uppercase; }
+.detail-topbar-close { width: 28px; height: 28px; border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; color: rgba(247,242,236,0.7); font-size: 14px; display: flex; align-items: center; justify-content: center; transition: all var(--t); }
+.detail-topbar-close:hover { background: rgba(255,255,255,0.1); color: #fff; }
+.detail-images { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; padding: 16px; background: var(--parchment); border-bottom: 1px solid var(--border); }
+.detail-img-wrap { aspect-ratio: 1; border-radius: 8px; overflow: hidden; cursor: pointer; border: 1px solid var(--border); }
+.detail-img-wrap img { width: 100%; height: 100%; object-fit: cover; transition: transform .2s; }
+.detail-img-wrap:hover img { transform: scale(1.04); }
+.detail-img-ph { aspect-ratio: 1; border: 2px dashed var(--border-md); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 4px; }
+.detail-img-ph span { font-size: 9px; color: var(--muted); }
+.detail-body { padding: 22px 24px 28px; display: grid; grid-template-columns: 1.2fr 1fr; gap: 28px; }
+.detail-name { font-family: var(--serif); font-size: 22px; font-weight: 300; font-style: italic; margin-bottom: 2px; line-height: 1.2; }
+.detail-desc { font-size: 12px; color: var(--muted); margin-bottom: 16px; }
+.detail-tag-block { margin-bottom: 18px; }
+.detail-tag-block-title { font-size: 9px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); margin-bottom: 8px; }
+.detail-notes-block { border-top: 1px solid var(--border); padding-top: 14px; margin-top: 4px; }
+.detail-notes-item { margin-bottom: 12px; }
+.detail-notes-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 4px; }
+.detail-notes-text { font-size: 12px; color: var(--ink); line-height: 1.6; }
+.attr-table { width: 100%; border-collapse: collapse; }
+.attr-row { border-bottom: 1px solid var(--border); }
+.attr-row:last-child { border-bottom: none; }
+.attr-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); padding: 6px 12px 6px 0; width: 40%; vertical-align: middle; }
+.attr-val { font-size: 12px; font-weight: 500; color: var(--ink); padding: 6px 0; vertical-align: middle; }
+.color-swatches-row { display: flex; gap: 4px; }
+
+/* ── LIGHTBOX ───────────────────────────────────────────── */
+.lightbox { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 400; align-items: center; justify-content: center; }
+.lightbox.open { display: flex; }
+.lightbox img { max-width: 90vw; max-height: 88vh; border-radius: 8px; object-fit: contain; }
+.lightbox-close { position: absolute; top: 18px; right: 18px; width: 36px; height: 36px; background: rgba(255,255,255,0.12); border-radius: 50%; color: #fff; font-size: 18px; display: flex; align-items: center; justify-content: center; }
+.lightbox-close:hover { background: rgba(255,255,255,0.22); }
+
+/* ── MODAL ──────────────────────────────────────────────── */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(28,21,16,0.55); z-index: 300; align-items: flex-start; justify-content: center; padding: 24px 16px; overflow-y: auto; }
+.modal-overlay.open { display: flex; }
+.modal { background: #fff; border-radius: var(--radius-lg); width: min(680px,94vw); padding: 28px; box-shadow: var(--shadow-lg); margin: auto; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.modal-title { font-family: var(--serif); font-size: 22px; font-weight: 300; font-style: italic; }
+.modal-subtitle { font-size: 11px; color: var(--muted); margin-bottom: 22px; }
+.modal-x { width: 28px; height: 28px; border: 1px solid var(--border-md); border-radius: 6px; font-size: 14px; color: var(--muted); display: flex; align-items: center; justify-content: center; transition: all var(--t); }
+.modal-x:hover { background: var(--parchment); color: var(--ink); }
+.modal-section { margin-bottom: 24px; padding-bottom: 24px; border-bottom: 1px solid var(--border); }
+.modal-section:last-of-type { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+.modal-section-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+.modal-section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* ── FORM ELEMENTS ──────────────────────────────────────── */
+.fg { margin-bottom: 14px; }
+.fl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 5px; display: block; }
+.fi, .fta { width: 100%; padding: 8px 12px; border: 1px solid var(--border-md); border-radius: var(--radius); font-size: 13px; color: var(--ink); background: var(--cream); outline: none; transition: border-color var(--t); }
+.fi:focus, .fta:focus { border-color: var(--copper); background: #fff; }
+.fta { min-height: 80px; resize: vertical; line-height: 1.6; }
+.frow { display: flex; gap: 12px; }
+.frow .fg { flex: 1; }
+.submit-btn { width: 100%; padding: 11px; background: var(--ink); color: var(--cream); border-radius: var(--radius); font-size: 13px; font-weight: 500; letter-spacing: 0.05em; margin-top: 8px; transition: opacity var(--t); }
+.submit-btn:hover { opacity: 0.84; }
+.submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── SMART SELECT (dropdown + add custom) ───────────────── */
+.smart-select-wrap { position: relative; }
+.smart-select { width: 100%; padding: 8px 12px; border: 1px solid var(--border-md); border-radius: var(--radius); font-size: 13px; color: var(--ink); background: var(--cream); outline: none; appearance: none; transition: border-color var(--t); cursor: pointer; }
+.smart-select:focus { border-color: var(--copper); }
+.smart-select-arrow { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--muted); font-size: 10px; }
+.custom-input-row { display: flex; gap: 6px; margin-top: 6px; }
+.custom-input-row .fi { flex: 1; }
+.add-custom-btn { padding: 8px 14px; background: var(--ink); color: var(--cream); border-radius: var(--radius); font-size: 12px; flex-shrink: 0; transition: opacity var(--t); }
+.add-custom-btn:hover { opacity: 0.82; }
+
+/* ── ART STYLE SELECTOR ─────────────────────────────────── */
+.attr-visual-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
+.attr-visual-opt { border: 1.5px solid var(--border-md); border-radius: var(--radius); padding: 10px 12px; cursor: pointer; transition: all var(--t); text-align: left; background: var(--cream); }
+.attr-visual-opt:hover { border-color: var(--copper); background: #fff; }
+.attr-visual-opt.selected { border-color: var(--ink); background: var(--ink); color: var(--cream); }
+.attr-visual-opt.selected .attr-visual-def { color: rgba(247,242,236,0.45); }
+.attr-visual-name { font-family: var(--serif); font-size: 13px; font-weight: 400; margin-bottom: 2px; }
+.attr-visual-def { font-size: 10px; color: var(--muted); line-height: 1.4; }
+.graphic-elements-grid { display: flex; flex-wrap: wrap; gap: 7px; }
+.graphic-el-btn { padding: 6px 13px; border: 1.5px solid var(--border-md); border-radius: 999px; font-size: 12px; color: var(--muted); background: var(--cream); transition: all var(--t); cursor: pointer; }
+.graphic-el-btn:hover { border-color: var(--copper); color: var(--cocoa); }
+.graphic-el-btn.selected { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+
+/* ── IMAGE UPLOAD ───────────────────────────────────────── */
+.img-upload-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+.img-slot { aspect-ratio: 1; border: 2px dashed var(--border-md); border-radius: var(--radius); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; cursor: pointer; transition: all var(--t); position: relative; overflow: hidden; background: var(--parchment); }
+.img-slot:hover { border-color: var(--copper); background: var(--cream); }
+.img-slot.has-image { border-style: solid; border-color: var(--border); }
+.img-slot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.img-slot-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.img-slot-icon { font-size: 18px; color: var(--muted); }
+.img-slot-remove { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; background: rgba(28,21,16,0.7); color: #fff; border-radius: 50%; font-size: 11px; display: none; align-items: center; justify-content: center; z-index: 2; }
+.img-slot.has-image:hover .img-slot-remove { display: flex; }
+.img-hint { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+input[type="file"] { display: none; }
+
+/* ── COLOUR STRIP ───────────────────────────────────────── */
+.color-strip { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.color-chip-wrap { position: relative; }
+.color-chip { width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border-md); cursor: pointer; }
+.color-chip-remove { position: absolute; top: -4px; right: -4px; width: 14px; height: 14px; background: var(--ink); color: #fff; border-radius: 50%; font-size: 9px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.add-color-btn { padding: 5px 10px; border: 1px dashed var(--border-md); border-radius: 6px; font-size: 11px; color: var(--muted); transition: all var(--t); }
+.add-color-btn:hover { border-color: var(--copper); color: var(--copper); }
+
+/* ── SMART TAG SYSTEM ───────────────────────────────────── */
+.tag-system { background: var(--parchment); border-radius: var(--radius); padding: 16px; }
+.tag-system-intro { font-size: 12px; color: var(--muted); line-height: 1.6; margin-bottom: 14px; }
+.tag-group { margin-bottom: 12px; }
+.tag-group-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; display: block; }
+.tag-items { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag-item { display: flex; align-items: center; border: 1px solid var(--border-md); border-radius: 6px; overflow: hidden; background: #fff; transition: all var(--t); }
+.tag-item.suggested { border-color: var(--gold); }
+.tag-item-name { padding: 5px 10px; font-size: 11px; color: var(--muted); border-right: 1px solid var(--border); }
+.tag-rating-btns { display: flex; }
+.tag-rating-btn { padding: 5px 8px; font-size: 10px; color: var(--muted); transition: all var(--t); border-right: 1px solid var(--border); }
+.tag-rating-btn:last-child { border-right: none; }
+.tag-rating-btn:hover { background: var(--parchment); }
+.tag-rating-btn.active-1 { background: #F5EDE4; color: var(--rating-1); font-weight: 500; }
+.tag-rating-btn.active-2 { background: #FDF3E0; color: var(--rating-2); font-weight: 500; }
+.tag-rating-btn.active-3 { background: #EAF2E8; color: var(--rating-3); font-weight: 500; }
+.tag-suggested-label { font-size: 9px; color: var(--gold); padding: 0 6px; background: #FFF8ED; }
+
+/* ── PRODUCTS ───────────────────────────────────────────── */
+.product-list { display: flex; flex-direction: column; gap: 12px; }
+.product-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+.product-card-head { display: flex; align-items: center; gap: 16px; padding: 14px 18px; cursor: pointer; transition: background var(--t); }
+.product-card-head:hover { background: var(--parchment); }
+.product-icon { width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; background: var(--cream); flex-shrink: 0; border: 1px solid var(--border); }
+.product-name { font-family: var(--serif); font-size: 16px; font-weight: 400; }
+.product-tagline { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.product-chips { margin-left: auto; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.chip { padding: 3px 10px; border-radius: 5px; font-size: 10px; font-weight: 500; }
+.chip-cat { background: #EEEDFE; color: #3C3489; }
+.chip-cogs { background: #EAF3DE; color: #27500A; }
+.chip-price { background: #FDF3E0; color: #7A4E0A; }
+.product-edit-btn { padding: 5px 12px; border: 1px solid var(--border-md); border-radius: 6px; font-size: 11px; color: var(--muted); transition: all var(--t); margin-left: 4px; flex-shrink: 0; }
+.product-edit-btn:hover { background: var(--parchment); color: var(--cocoa); border-color: var(--cocoa); }
+.product-expand { border-top: 1px solid var(--border); display: none; background: var(--cream); }
+.product-expand.open { display: block; }
+.prod-photo-strip { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; padding: 14px 18px; background: var(--parchment); border-bottom: 1px solid var(--border); }
+.prod-photo-wrap { aspect-ratio: 1; border-radius: 8px; overflow: hidden; cursor: pointer; border: 1px solid var(--border); }
+.prod-photo-wrap img { width: 100%; height: 100%; object-fit: cover; transition: transform .2s; }
+.prod-photo-wrap:hover img { transform: scale(1.04); }
+.prod-photo-ph { aspect-ratio: 1; border: 2px dashed var(--border-md); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 4px; }
+.prod-photo-ph span { font-size: 9px; color: var(--muted); }
+.prod-expand-body { padding: 18px; display: grid; grid-template-columns: 1.8fr 1fr 1fr; gap: 20px; }
+.expand-section h4 { font-size: 10px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); margin-bottom: 10px; }
+.ing-display { width: 100%; border-collapse: collapse; font-size: 12px; }
+.ing-display th { font-size: 9px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); padding: 4px 8px 6px 0; border-bottom: 1px solid var(--border-md); text-align: left; font-weight: 400; }
+.ing-display td { padding: 7px 8px 7px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
+.ing-display tr:last-child td { border-bottom: none; }
+.ing-source-link { font-size: 11px; color: var(--copper); display: block; }
+.ing-source-meta { font-size: 10px; color: var(--muted); }
+.cogs-total { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-md); display: flex; justify-content: space-between; font-size: 13px; font-family: var(--serif); }
+.cogs-total span:last-child { font-weight: 600; color: var(--cocoa); }
+.recipe-step { display: flex; gap: 8px; margin-bottom: 7px; font-size: 12px; color: var(--muted); line-height: 1.5; }
+.step-num { width: 18px; height: 18px; border-radius: 50%; background: var(--ink); color: var(--cream); font-size: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+
+/* ── INGREDIENT BUILDER ─────────────────────────────────── */
+.ing-builder { border: 1px solid var(--border-md); border-radius: var(--radius); overflow: hidden; }
+.ing-header { display: grid; grid-template-columns: 1.8fr 0.8fr 0.8fr 1.2fr 0.8fr 1.2fr 32px; background: var(--parchment); border-bottom: 1px solid var(--border-md); }
+.ing-header span { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); padding: 7px 8px; }
+.ing-row { display: grid; grid-template-columns: 1.8fr 0.8fr 0.8fr 1.2fr 0.8fr 1.2fr 32px; border-bottom: 1px solid var(--border); }
+.ing-row:last-child { border-bottom: none; }
+.ing-cell input { width: 100%; padding: 8px; border: none; border-right: 1px solid var(--border); background: transparent; font-size: 12px; color: var(--ink); outline: none; }
+.ing-cell input:focus { background: #fffdf8; }
+.ing-remove { display: flex; align-items: center; justify-content: center; font-size: 16px; color: var(--muted); border-left: 1px solid var(--border); width: 100%; background: none; border-top: none; border-bottom: none; border-right: none; transition: color var(--t); }
+.ing-remove:hover { color: #c0392b; background: #fff5f5; }
+.add-ing-btn { width: 100%; padding: 8px; font-size: 12px; color: var(--copper); border-top: 1px solid var(--border-md); background: var(--parchment); text-align: center; transition: background var(--t); }
+.add-ing-btn:hover { background: var(--cream); }
+
+/* ── DESIGN DIRECTION ───────────────────────────────────── */
+.dir-section-label { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.dir-section-title { font-family: var(--serif); font-size: 20px; font-weight: 300; font-style: italic; display: block; }
+.dir-section-sub { font-size: 11px; color: var(--muted); margin-top: 3px; display: block; }
+.dir-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.dir-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; }
+.dir-card h3 { font-family: var(--serif); font-size: 16px; font-weight: 400; font-style: italic; margin-bottom: 11px; color: var(--cocoa); }
+.dir-insights-strip { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 20px; }
+.dir-insight-card { background: var(--ink); border-radius: var(--radius); padding: 14px 16px; color: var(--cream); }
+.dir-insight-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(247,242,236,0.4); margin-bottom: 6px; }
+.dir-insight-value { font-family: var(--serif); font-size: 15px; font-weight: 300; line-height: 1.3; }
+.dir-insight-sub { font-size: 10px; color: rgba(247,242,236,0.35); margin-top: 4px; }
+.dir-color-strip { display: flex; gap: 6px; margin-bottom: 10px; }
+.dir-color-chip { height: 28px; border-radius: 5px; flex: 1; }
+.liked-insight-row { display: flex; align-items: center; gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--border); }
+.liked-insight-row:last-child { border-bottom: none; }
+.liked-insight-name { font-size: 12px; min-width: 130px; }
+.liked-insight-bar { flex: 1; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.liked-insight-fill-1 { height: 100%; background: var(--rating-1); border-radius: 2px; }
+.liked-insight-fill-2 { height: 100%; background: var(--rating-2); border-radius: 2px; }
+.liked-insight-fill-3 { height: 100%; background: var(--rating-3); border-radius: 2px; }
+.liked-insight-score { font-size: 11px; color: var(--muted); min-width: 30px; text-align: right; }
+.breakdown-row { display: flex; align-items: center; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+.breakdown-row:last-child { border-bottom: none; }
+.breakdown-key { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; }
+.breakdown-val { font-weight: 500; }
+.brand-field-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+.brand-field-header h3 { margin-bottom: 0; }
+.brand-field-hint { font-size: 11px; color: var(--muted); }
+.brand-field { width: 100%; padding: 10px 12px; border: 1px solid var(--border-md); border-radius: var(--radius); font-size: 13px; color: var(--ink); background: var(--cream); outline: none; resize: vertical; min-height: 90px; line-height: 1.7; transition: border-color var(--t); font-family: var(--sans); }
+.brand-field:focus { border-color: var(--copper); background: #fff; }
+.brand-field::placeholder { color: var(--border-md); }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-gem"></div>
+    <div class="login-logo">Cacao Studio</div>
+    <div class="login-sub">Evoke Chocolate</div>
+    <div class="login-field"><label>Email</label><input type="email" id="auth-email" autocomplete="email"></div>
+    <div class="login-field"><label>Password</label><input type="password" id="auth-password" autocomplete="current-password"></div>
+    <button class="login-btn" id="auth-btn" onclick="handleAuth()">Sign in</button>
+    <div class="login-err" id="auth-err"></div>
+    <div class="login-toggle" id="auth-toggle">No account? <a onclick="toggleAuthMode()">Create one</a></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="loading-bar" id="loading-bar" style="width:0%"></div>
+  <div class="toast" id="toast"></div>
+
+  <nav class="topnav">
+    <div class="brand"><div class="brand-gem"></div>Cacao Studio</div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="showPage('packaging',this)">Packaging</button>
+      <button class="nav-tab" onclick="showPage('direction',this)">Design Direction</button>
+      <button class="nav-tab" onclick="showPage('products',this)">Products</button>
+    </div>
+    <div class="nav-right">
+      <span class="nav-user" id="nav-user-email"></span>
+      <button class="nav-signout" onclick="signOut()">Sign out</button>
+    </div>
+  </nav>
+
+  <!-- PACKAGING PAGE -->
+  <div class="page active" id="page-packaging">
+    <div class="page-head">
+      <div><div class="page-head-title">Packaging Catalogue</div><div class="page-head-sub">Click any card to expand · rate what you'd borrow for Evoke</div></div>
+      <button class="btn-primary" onclick="openPackModal()">+ Add Concept</button>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-label">Concepts</div><div class="stat-value" id="pack-count">0</div></div>
+      <div class="stat-card"><div class="stat-label">Most loved attribute</div><div class="stat-value" id="top-attr" style="font-size:16px;margin-top:6px">—</div></div>
+      <div class="stat-card"><div class="stat-label">Art styles</div><div class="stat-value" id="art-count">0</div></div>
+    </div>
+    <div class="filter-row">
+      <input class="search-input" id="pack-search" placeholder="Search by brand, style, notes…" oninput="applyPackFilters()">
+      <button class="filter-chip active" onclick="setPackFilter(this,'all')">All</button>
+      <button class="filter-chip" onclick="setPackFilter(this,'Minimal')">Minimal</button>
+      <button class="filter-chip" onclick="setPackFilter(this,'Luxury')">Luxury</button>
+      <button class="filter-chip" onclick="setPackFilter(this,'Artisan')">Artisan</button>
+      <button class="filter-chip" onclick="setPackFilter(this,'Geometric')">Geometric</button>
+      <button class="filter-chip" onclick="setPackFilter(this,'Illustrative')">Illustrative</button>
+      <button class="filter-chip" onclick="setPackFilter(this,'Bold')">Bold</button>
+    </div>
+    <div class="pack-grid" id="pack-grid"></div>
+  </div>
+
+  <!-- DIRECTION PAGE -->
+  <div class="page" id="page-direction">
+    <div class="page-head">
+      <div><div class="page-head-title">Design Direction</div><div class="page-head-sub">Catalogue insights &amp; brand foundation for Evoke Chocolate</div></div>
+    </div>
+    <div class="dir-section-label">
+      <div><div class="dir-section-title">What we've observed</div><div class="dir-section-sub">Synthesised from your packaging catalogue</div></div>
+    </div>
+    <div id="dir-insights-hero" style="margin-bottom:20px">
+      <div style="font-size:12px;color:var(--muted);padding:20px 0">Add packaging concepts and rate attributes to see insights here.</div>
+    </div>
+    <div class="dir-two-col" style="margin-bottom:28px">
+      <div class="dir-card">
+        <h3>Attribute ratings</h3>
+        <div id="liked-summary" style="margin-top:8px"><div style="font-size:12px;color:var(--muted)">No data yet.</div></div>
+      </div>
+      <div class="dir-card">
+        <h3>Catalogue breakdown</h3>
+        <div id="dir-breakdown" style="margin-top:8px"><div style="font-size:12px;color:var(--muted)">No concepts yet.</div></div>
+      </div>
+    </div>
+    <div class="dir-section-label" style="margin-top:12px">
+      <div><div class="dir-section-title">Evoke Chocolate — Brand Foundation</div><div class="dir-section-sub">Click any field to edit · saves automatically</div></div>
+      <div id="brand-save-indicator" style="font-size:11px;color:var(--sage);opacity:0;transition:opacity .3s">Saved ✦</div>
+    </div>
+    <div class="dir-card" style="margin-bottom:16px">
+      <div class="brand-field-header"><h3>Brand story</h3><span class="brand-field-hint">The narrative origin — why Evoke exists</span></div>
+      <textarea class="brand-field" id="bf-origin-story" placeholder="Every bar of Evoke Chocolate begins with a single question: what does this place taste like?…" oninput="scheduleBrandSave()"></textarea>
+    </div>
+    <div class="dir-two-col" style="margin-bottom:16px">
+      <div class="dir-card">
+        <div class="brand-field-header"><h3>Mission</h3><span class="brand-field-hint">What we're here to do</span></div>
+        <textarea class="brand-field" id="bf-mission" placeholder="To make single-origin chocolate that tells the story of its source…" oninput="scheduleBrandSave()"></textarea>
+      </div>
+      <div class="dir-card">
+        <div class="brand-field-header"><h3>Tone of voice</h3><span class="brand-field-hint">How we speak</span></div>
+        <textarea class="brand-field" id="bf-tone" placeholder="Confident but never loud. Knowledgeable without being academic…" oninput="scheduleBrandSave()"></textarea>
+      </div>
+    </div>
+    <div class="dir-two-col" style="margin-bottom:16px">
+      <div class="dir-card">
+        <div class="brand-field-header"><h3>Target customer</h3><span class="brand-field-hint">Who we're talking to</span></div>
+        <textarea class="brand-field" id="bf-target" placeholder="The conscious connoisseur. They buy wine by the producer, not the label…" oninput="scheduleBrandSave()"></textarea>
+      </div>
+      <div class="dir-card">
+        <div class="brand-field-header"><h3>Price positioning</h3><span class="brand-field-hint">Where we sit in the market</span></div>
+        <textarea class="brand-field" id="bf-price" placeholder="Premium to ultra-premium. $12–28 per bar at retail…" oninput="scheduleBrandSave()"></textarea>
+      </div>
+    </div>
+    <div class="dir-card" style="margin-bottom:16px">
+      <div class="brand-field-header"><h3>Design direction notes</h3><span class="brand-field-hint">Running notes on the visual identity</span></div>
+      <textarea class="brand-field" id="bf-design-notes" style="min-height:120px" placeholder="Dark, matte, tactile. Foil used sparingly for wordmark only…" oninput="scheduleBrandSave()"></textarea>
+    </div>
+  </div>
+
+  <!-- PRODUCTS PAGE -->
+  <div class="page" id="page-products">
+    <div class="page-head">
+      <div><div class="page-head-title">Product Catalogue</div><div class="page-head-sub">Recipes, ingredients, sourcing and COGS</div></div>
+      <button class="btn-primary" onclick="openProductModal()">+ Add Product</button>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-label">Products</div><div class="stat-value" id="prod-count">0</div></div>
+      <div class="stat-card"><div class="stat-label">Avg COGS</div><div class="stat-value" id="avg-cogs">—</div></div>
+      <div class="stat-card"><div class="stat-label">Categories</div><div class="stat-value" id="cat-count">0</div></div>
+    </div>
+    <div class="filter-row">
+      <input class="search-input" id="prod-search" placeholder="Search products…" oninput="applyProdFilters()">
+      <button class="filter-chip active" onclick="setProdFilter(this,'all')">All</button>
+      <button class="filter-chip" onclick="setProdFilter(this,'Bar')">Bars</button>
+      <button class="filter-chip" onclick="setProdFilter(this,'Bonbon')">Bonbons</button>
+      <button class="filter-chip" onclick="setProdFilter(this,'Drinking')">Drinking</button>
+    </div>
+    <div class="product-list" id="product-list"></div>
+  </div>
+</div>
+
+<!-- DETAIL OVERLAY -->
+<div class="overlay" id="detail-overlay" onclick="if(event.target===this)closeDetail()">
+  <div class="detail-panel" onclick="event.stopPropagation()">
+    <div class="detail-topbar">
+      <span class="detail-topbar-label">Packaging Concept</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="detail-topbar-close" id="detail-edit-btn" onclick="editPackagingConcept()" style="width:auto;padding:0 12px;font-size:11px;letter-spacing:0.05em">Edit</button>
+        <button class="detail-topbar-close" id="detail-delete-btn" onclick="deletePackagingConcept()" style="width:auto;padding:0 12px;font-size:11px;letter-spacing:0.05em;color:rgba(255,120,100,0.8);border-color:rgba(255,120,100,0.3)">Delete</button>
+        <button class="detail-topbar-close" onclick="closeDetail()">✕</button>
+      </div>
+    </div>
+    <div class="detail-images" id="detail-images"></div>
+    <div class="detail-body">
+      <div>
+        <div class="detail-name" id="detail-name"></div>
+        <div class="detail-desc" id="detail-desc"></div>
+        <div class="detail-tag-block">
+          <div class="detail-tag-block-title">Rated attributes</div>
+          <div class="tag-rating-strip" id="detail-tags"></div>
+        </div>
+        <div class="detail-notes-block" id="detail-notes-block"></div>
+      </div>
+      <div><table class="attr-table" id="detail-attrs"></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- LIGHTBOX -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+  <img id="lightbox-img" src="" alt="">
+</div>
+
+<!-- ADD PACKAGING MODAL -->
+<div class="modal-overlay" id="modal-pack" onclick="if(event.target===this)closeModal('modal-pack')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title">Add Packaging Concept</div>
+      <button class="modal-x" onclick="closeModal('modal-pack')">✕</button>
+    </div>
+    <div class="modal-subtitle">Document a packaging reference and rate what inspires you about it</div>
+
+    <!-- SECTION 1: IDENTITY -->
+    <div class="modal-section">
+      <div class="modal-section-title">Identity</div>
+      <div class="frow">
+        <div class="fg" style="flex:1.2"><label class="fl">Brand / company</label><input class="fi" id="p-brand" placeholder="e.g. Ritual Chocolate"></div>
+        <div class="fg" style="flex:2"><label class="fl">Product name or description</label><input class="fi" id="p-desc" placeholder="e.g. Fleur de Sel Dark Chocolate with Sea Salt 70% Cacao"></div>
+      </div>
+    </div>
+
+    <!-- SECTION 2: PHOTOS -->
+    <div class="modal-section">
+      <div class="modal-section-title">Photos</div>
+      <div class="img-upload-grid" id="img-upload-grid">
+        <div class="img-slot" id="img-slot-0" onclick="triggerUpload(0)">
+          <input type="file" id="img-file-0" accept="image/*" onchange="handleImageFile(0,this)">
+          <div class="img-slot-icon">+</div>
+          <div class="img-slot-label">Front</div>
+          <button class="img-slot-remove" onclick="removeImage(event,0)">×</button>
+        </div>
+        <div class="img-slot" id="img-slot-1" onclick="triggerUpload(1)">
+          <input type="file" id="img-file-1" accept="image/*" onchange="handleImageFile(1,this)">
+          <div class="img-slot-icon">+</div>
+          <div class="img-slot-label">Back</div>
+          <button class="img-slot-remove" onclick="removeImage(event,1)">×</button>
+        </div>
+        <div class="img-slot" id="img-slot-2" onclick="triggerUpload(2)">
+          <input type="file" id="img-file-2" accept="image/*" onchange="handleImageFile(2,this)">
+          <div class="img-slot-icon">+</div>
+          <div class="img-slot-label">Open</div>
+          <button class="img-slot-remove" onclick="removeImage(event,2)">×</button>
+        </div>
+        <div class="img-slot" id="img-slot-3" onclick="triggerUpload(3)">
+          <input type="file" id="img-file-3" accept="image/*" onchange="handleImageFile(3,this)">
+          <div class="img-slot-icon">+</div>
+          <div class="img-slot-label">Detail</div>
+          <button class="img-slot-remove" onclick="removeImage(event,3)">×</button>
+        </div>
+      </div>
+      <div class="img-hint">Click a slot to upload. Photos are stored securely in the cloud.</div>
+      <div style="margin-top:10px">
+        <label class="fl">Colour scheme <span style="font-weight:300;text-transform:none;letter-spacing:0">(extracted from photos or add manually)</span></label>
+        <div class="color-strip" id="color-strip">
+          <button class="add-color-btn" onclick="addManualColor()">+ Add colour</button>
+        </div>
+        <div id="color-hidden-inputs"></div>
+      </div>
+    </div>
+
+    <!-- SECTION 3: ATTRIBUTES -->
+    <div class="modal-section">
+      <div class="modal-section-title">Packaging Structure</div>
+
+      <!-- ROW 1: Format + Size -->
+      <div class="frow">
+        <div class="fg">
+          <label class="fl">Packaging format <span style="font-weight:300;text-transform:none;letter-spacing:0;font-size:10px">— the structural type</span></label>
+          <div class="attr-visual-grid" id="format-grid">
+            <button class="attr-visual-opt" onclick="selectAttr(this,'p-format','Rigid box')" data-val="Rigid box">
+              <div class="attr-visual-name">Rigid box</div>
+              <div class="attr-visual-def">Sturdy walls, holds shape on its own. Like a gift box.</div>
+            </button>
+            <button class="attr-visual-opt" onclick="selectAttr(this,'p-format','Folding carton')" data-val="Folding carton">
+              <div class="attr-visual-name">Folding carton</div>
+              <div class="attr-visual-def">Flat card stock folded into a box. Most chocolate bars.</div>
+            </button>
+            <button class="attr-visual-opt" onclick="selectAttr(this,'p-format','Sleeve')" data-val="Sleeve">
+              <div class="attr-visual-name">Sleeve</div>
+              <div class="attr-visual-def">A flat band that wraps around or slides over the bar.</div>
+            </button>
+            <button class="attr-visual-opt" onclick="selectAttr(this,'p-format','Wrapper')" data-val="Wrapper">
+              <div class="attr-visual-name">Wrapper</div>
+              <div class="attr-visual-def">Paper or foil wrapped directly around the bar. No box.</div>
+            </button>
+            <button class="attr-visual-opt" onclick="selectAttr(this,'p-format','Pouch / bag')" data-val="Pouch / bag">
+              <div class="attr-visual-name">Pouch / bag</div>
+              <div class="attr-visual-def">Flexible packaging, often resealable. Common for drinking chocolate.</div>
+            </button>
+            <button class="attr-visual-opt" onclick="selectAttr(this,'p-format','Tube')" data-val="Tube">
+              <div class="attr-visual-name">Tube</div>
+              <div class="attr-visual-def">Cylindrical form. Less common, memorable on shelf.</div>
+            </button>
+          </div>
+          <input type="hidden" id="p-format" value="">
+          <div class="custom-input-row" style="margin-top:8px">
+            <input class="fi" id="p-format-custom-val" placeholder="Other format…">
+            <button class="add-custom-btn" onclick="selectAttrCustom('p-format','p-format-custom-val')">Use this</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ROW 2: Size + Orientation -->
+      <div class="frow" style="margin-top:16px">
+        <div class="fg">
+          <label class="fl">Size</label>
+          <div class="smart-select-wrap">
+            <select class="smart-select" id="p-size" onchange="onAttrChange()">
+              <option value="">— select —</option>
+              <option>Mini (under 25g)</option><option>Small (25–50g)</option><option>Medium (51–75g)</option><option>Standard (76–100g)</option><option>Large (100g+)</option><option>Gift box (multi-bar)</option><option>Collector / trunk</option>
+            </select>
+            <span class="smart-select-arrow">▾</span>
+          </div>
+          <div class="custom-input-row" id="p-size-custom" style="display:none">
+            <input class="fi" id="p-size-custom-val" placeholder="Describe the size…">
+            <button class="add-custom-btn" onclick="addCustomOption('p-size','p-size-custom-val','size')">Add</button>
+          </div>
+        </div>
+        <div class="fg">
+          <label class="fl">Orientation</label>
+          <div class="smart-select-wrap">
+            <select class="smart-select" id="p-orient" onchange="onAttrChange()">
+              <option value="">— select —</option>
+              <option>Portrait (tall)</option><option>Landscape (wide)</option><option>Square</option><option>Upright / standing</option>
+            </select>
+            <span class="smart-select-arrow">▾</span>
+          </div>
+          <div class="custom-input-row" id="p-orient-custom" style="display:none">
+            <input class="fi" id="p-orient-custom-val" placeholder="Describe the orientation…">
+            <button class="add-custom-btn" onclick="addCustomOption('p-orient','p-orient-custom-val','orient')">Add</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ROW 3: Profile -->
+      <div class="fg" style="margin-top:16px">
+        <label class="fl">Profile / form <span style="font-weight:300;text-transform:none;letter-spacing:0;font-size:10px">— the physical character</span></label>
+        <div class="attr-visual-grid">
+          <button class="attr-visual-opt" onclick="selectAttr(this,'p-profile','Slim / flat')" data-val="Slim / flat">
+            <div class="attr-visual-name">Slim / flat</div>
+            <div class="attr-visual-def">Thin profile, lays flat. Like Mission Chocolate.</div>
+          </button>
+          <button class="attr-visual-opt" onclick="selectAttr(this,'p-profile','Rigid / structured')" data-val="Rigid / structured">
+            <div class="attr-visual-name">Rigid / structured</div>
+            <div class="attr-visual-def">Squared edges, holds shape. Feels substantial in hand.</div>
+          </button>
+          <button class="attr-visual-opt" onclick="selectAttr(this,'p-profile','Soft / flexible')" data-val="Soft / flexible">
+            <div class="attr-visual-name">Soft / flexible</div>
+            <div class="attr-visual-def">Yields when handled. Foil, paper, or soft pouch.</div>
+          </button>
+          <button class="attr-visual-opt" onclick="selectAttr(this,'p-profile','Rounded / organic')" data-val="Rounded / organic">
+            <div class="attr-visual-name">Rounded / organic</div>
+            <div class="attr-visual-def">Soft corners, curved edges, non-rectilinear.</div>
+          </button>
+          <button class="attr-visual-opt" onclick="selectAttr(this,'p-profile','Tall / upright')" data-val="Tall / upright">
+            <div class="attr-visual-name">Tall / upright</div>
+            <div class="attr-visual-def">Portrait format, stands on shelf, strong vertical presence.</div>
+          </button>
+          <button class="attr-visual-opt" onclick="selectAttr(this,'p-profile','Square / compact')" data-val="Square / compact">
+            <div class="attr-visual-name">Square / compact</div>
+            <div class="attr-visual-def">Equal proportions, feels dense and considered.</div>
+          </button>
+        </div>
+        <input type="hidden" id="p-profile" value="">
+        <div class="custom-input-row" style="margin-top:8px">
+          <input class="fi" id="p-profile-custom-val" placeholder="Other profile…">
+          <button class="add-custom-btn" onclick="selectAttrCustom('p-profile','p-profile-custom-val')">Use this</button>
+        </div>
+      </div>
+
+      <!-- ROW 4: Closure mechanism -->
+      <div class="fg" style="margin-top:16px">
+        <label class="fl">Closure mechanism <span style="font-weight:300;text-transform:none;letter-spacing:0;font-size:10px">— how it stays shut</span></label>
+        <div class="attr-visual-grid">
+          <button class="attr-visual-opt" onclick="selectAttr(this,'p-closure','Tuck-end fold')" data-val="Tuck-end fold">
+            <div class="attr-visual-name">Tuck-end fold</div>
+            <div class="attr-visual-def">Flaps fold and tuck in. Like a cereal box or standard carton.</div>
+          </button>
+          <button class="attr-visual-opt" onclick="selectAttr(this,'p-closure','Gate-fold')" data-val="Gate-fold">
+            <div class="attr-visual-name">Gate-fold</div>
+            <div class="attr-visual-def">Two panels open outward like doors. Like Ritual Chocolate.</div>
+          </button>
+          <button class="attr-visual-opt" onclick="selectAttr(this,'p-closure','Sticker seal')" data-val="Sticker seal">
+            <div class="attr-visual-name">Sticker seal</div>
+            <div class="attr-visual-def">Folded closed and held with a sticker or label.</div>
+          </button>
+          <button class="attr-visual-opt" onclick="selectAttr(this,'p-closure','Magnetic clasp')" data-val="Magnetic clasp">
+            <div class="attr-visual-name">Magnetic clasp</div>
+            <div class="attr-visual-def">Hidden magnet holds lid closed. Common in luxury boxes.</div>
+          </button>
+          <button class="attr-visual-opt" onclick="selectAttr(this,'p-closure','Ribbon tie')" data-val="Ribbon tie">
+            <div class="attr-visual-name">Ribbon tie</div>
+            <div class="attr-visual-def">Ribbon or string tied around the package.</div>
+          </button>
+          <button class="attr-visual-opt" onclick="selectAttr(this,'p-closure','Friction fit')" data-val="Friction fit">
+            <div class="attr-visual-name">Friction fit</div>
+            <div class="attr-visual-def">Lid or sleeve held by tension alone. Slides off cleanly.</div>
+          </button>
+          <button class="attr-visual-opt" onclick="selectAttr(this,'p-closure','Wax seal')" data-val="Wax seal">
+            <div class="attr-visual-name">Wax seal</div>
+            <div class="attr-visual-def">Sealed with wax, must be broken to open.</div>
+          </button>
+          <button class="attr-visual-opt" onclick="selectAttr(this,'p-closure','Belly band')" data-val="Belly band">
+            <div class="attr-visual-name">Belly band</div>
+            <div class="attr-visual-def">A paper ring or band wrapped around the middle.</div>
+          </button>
+          <button class="attr-visual-opt" onclick="selectAttr(this,'p-closure','Heat seal')" data-val="Heat seal">
+            <div class="attr-visual-name">Heat seal</div>
+            <div class="attr-visual-def">Sealed with heat, common for pouches and foil wrappers.</div>
+          </button>
+        </div>
+        <input type="hidden" id="p-closure" value="">
+        <div class="custom-input-row" style="margin-top:8px">
+          <input class="fi" id="p-closure-custom-val" placeholder="Other closure…">
+          <button class="add-custom-btn" onclick="selectAttrCustom('p-closure','p-closure-custom-val')">Use this</button>
+        </div>
+      </div>
+
+      <!-- ROW 5: Inner wrapping -->
+      <div class="fg" style="margin-top:16px">
+        <label class="fl">Inner wrapping</label>
+        <div class="smart-select-wrap">
+          <select class="smart-select" id="p-inner" onchange="onAttrChange()" style="max-width:360px">
+            <option value="">— select —</option>
+            <option>None</option><option>Opaque sealed wrapper (single-use)</option><option>Gold foil fold-over (resealable)</option><option>Foil (plain)</option><option>Foil (printed)</option><option>Wax paper</option><option>Tissue paper</option><option>Kraft paper</option><option>Cellophane / clear film</option><option>Moulded pulp tray</option><option>Other…</option>
+          </select>
+          <span class="smart-select-arrow">▾</span>
+        </div>
+        <div class="custom-input-row" id="p-inner-custom" style="display:none">
+          <input class="fi" id="p-inner-custom-val" placeholder="Describe the inner wrapping…">
+          <button class="add-custom-btn" onclick="addCustomOption('p-inner','p-inner-custom-val','inner')">Add</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 4: GRAPHIC ELEMENTS -->
+    <div class="modal-section">
+      <div class="modal-section-title">Graphic Elements</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.6">Select everything that's visually present on this packaging — these are observable facts, not style judgments.</div>
+      <div class="graphic-elements-grid" id="graphic-elements-grid">
+        <button class="graphic-el-btn" onclick="toggleGraphicEl(this,'Botanical illustration')">Botanical illustration</button>
+        <button class="graphic-el-btn" onclick="toggleGraphicEl(this,'Geometric pattern')">Geometric pattern</button>
+        <button class="graphic-el-btn" onclick="toggleGraphicEl(this,'Hand lettering')">Hand lettering</button>
+        <button class="graphic-el-btn" onclick="toggleGraphicEl(this,'Photography')">Photography</button>
+        <button class="graphic-el-btn" onclick="toggleGraphicEl(this,'Abstract pattern')">Abstract pattern</button>
+        <button class="graphic-el-btn" onclick="toggleGraphicEl(this,'Foil / metallic treatment')">Foil / metallic treatment</button>
+        <button class="graphic-el-btn" onclick="toggleGraphicEl(this,'Serif typography')">Serif typography</button>
+        <button class="graphic-el-btn" onclick="toggleGraphicEl(this,'Sans-serif typography')">Sans-serif typography</button>
+        <button class="graphic-el-btn" onclick="toggleGraphicEl(this,'Embossing / debossing')">Embossing / debossing</button>
+        <button class="graphic-el-btn" onclick="toggleGraphicEl(this,'Die cut / window')">Die cut / window</button>
+        <button class="graphic-el-btn" onclick="toggleGraphicEl(this,'Origin map')">Origin map</button>
+        <button class="graphic-el-btn" onclick="toggleGraphicEl(this,'Flat colour blocks')">Flat colour blocks</button>
+        <button class="graphic-el-btn" onclick="toggleGraphicEl(this,'Figurative illustration')">Figurative illustration</button>
+        <button class="graphic-el-btn" onclick="toggleGraphicEl(this,'Texture / pattern background')">Texture / pattern background</button>
+        <button class="graphic-el-btn" onclick="toggleGraphicEl(this,'Minimal / type only')">Minimal / type only</button>
+        <button class="graphic-el-btn" onclick="toggleGraphicEl(this,'Painterly artwork')">Painterly artwork</button>
+        <button class="graphic-el-btn" onclick="toggleGraphicEl(this,'Tasting notes')">Tasting notes</button>
+        <button class="graphic-el-btn" onclick="toggleGraphicEl(this,'Origin story / narrative')">Origin story / narrative</button>
+      </div>
+    </div>
+
+    <!-- SECTION 4: OBSERVATIONS -->
+    <div class="modal-section">
+      <div class="modal-section-title">Observations</div>
+      <div class="fg">
+        <label class="fl">What does this packaging do well?</label>
+        <textarea class="fta" id="p-what-works" placeholder="The gate-fold structure creates a genuine moment of discovery. The silver foil geometric illustration feels precise without being cold…" ></textarea>
+      </div>
+      <div class="fg">
+        <label class="fl">What would you borrow for Evoke? <span style="font-weight:300;font-size:11px;color:var(--muted)">Be specific — this directly informs the design direction</span></label>
+        <textarea class="fta" id="p-what-to-borrow" placeholder="The gate-fold reveal. The restraint of using foil only on the wordmark. The olive/sage ground colour…" ></textarea>
+      </div>
+      <div class="fg">
+        <label class="fl">What doesn't work / what would you change?</label>
+        <textarea class="fta" id="p-what-doesnt-work" placeholder="The silver feels slightly cold — gold would feel warmer and more inviting. The bar inside could be a slightly larger format…" ></textarea>
+      </div>
+    </div>
+
+    <!-- SECTION 5: TAG RATINGS -->
+    <div class="modal-section">
+      <div class="modal-section-title">Rate the attributes</div>
+      <div class="tag-system">
+        <div class="tag-system-intro">Based on what you've entered above, here's what stands out about this packaging. Rate each attribute that resonates — <strong>1 Interesting</strong>, <strong>2 Like</strong>, <strong>3 Love</strong>.</div>
+        <div id="tag-rating-ui"></div>
+      </div>
+    </div>
+
+    <button class="submit-btn" id="pack-submit-btn" onclick="savePackagingConcept()">Save Concept</button>
+  </div>
+</div>
+
+<!-- ADD/EDIT PRODUCT MODAL -->
+<div class="modal-overlay" id="modal-product" onclick="if(event.target===this)closeProductModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header"><div class="modal-title" id="prod-modal-title">Add Product</div><button class="modal-x" onclick="closeProductModal()">✕</button></div>
+    <div class="modal-subtitle">Document a product with recipe, sourcing and cost information</div>
+    <div class="frow">
+      <div class="fg"><label class="fl">Product name</label><input class="fi" id="pr-name" placeholder="e.g. Peruvian Dark 72%"></div>
+      <div class="fg"><label class="fl">Tagline</label><input class="fi" id="pr-tagline" placeholder="Single origin · floral notes"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="fl">Category</label><select class="smart-select" id="pr-cat" style="padding:8px 12px"><option>Bar</option><option>Bonbon</option><option>Drinking</option><option>Spread</option><option>Other</option></select></div>
+      <div class="fg"><label class="fl">Retail price ($)</label><input class="fi" id="pr-price" type="number" placeholder="12.00" step="0.01"></div>
+      <div class="fg"><label class="fl">Icon / emoji</label><input class="fi" id="pr-icon" placeholder="🍫" maxlength="4"></div>
+    </div>
+    <div class="fg">
+      <label class="fl">Photos — use images/filename.jpg</label>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+        <div class="img-path-row" style="flex-direction:column;align-items:flex-start;gap:3px"><span style="font-size:10px;color:var(--muted)">Photo 1</span><input class="fi" id="pr-img-0" placeholder="images/front.jpg"></div>
+        <div class="img-path-row" style="flex-direction:column;align-items:flex-start;gap:3px"><span style="font-size:10px;color:var(--muted)">Photo 2</span><input class="fi" id="pr-img-1" placeholder="images/detail.jpg"></div>
+        <div class="img-path-row" style="flex-direction:column;align-items:flex-start;gap:3px"><span style="font-size:10px;color:var(--muted)">Photo 3</span><input class="fi" id="pr-img-2" placeholder="images/bar.jpg"></div>
+        <div class="img-path-row" style="flex-direction:column;align-items:flex-start;gap:3px"><span style="font-size:10px;color:var(--muted)">Photo 4</span><input class="fi" id="pr-img-3" placeholder="images/open.jpg"></div>
+      </div>
+    </div>
+    <div class="fg">
+      <label class="fl">Ingredients &amp; Sourcing</label>
+      <div class="ing-builder">
+        <div class="ing-header"><span>Ingredient</span><span>Amount</span><span>Cost / unit</span><span>Supplier</span><span>MOQ</span><span>URL</span><span></span></div>
+        <div id="ing-rows"></div>
+        <button class="add-ing-btn" onclick="addIngRow()">+ Add ingredient</button>
+      </div>
+    </div>
+    <div class="fg"><label class="fl">Recipe steps — one per line</label><textarea class="fta" id="pr-recipe" placeholder="Temper cacao paste at 45°C&#10;Add sugar and butter, mix 4h"></textarea></div>
+    <div class="fg"><label class="fl">Notes</label><textarea class="fta" id="pr-notes" placeholder="Tasting notes, process ideas…"></textarea></div>
+    <input type="hidden" id="pr-editing-id" value="">
+    <button class="submit-btn" id="prod-submit-btn" onclick="saveProduct()">Save Product</button>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════
+   SUPABASE
+══════════════════════════════════════════════════════════ */
+const SUPABASE_URL = 'https://ouotklitiokwasgaogql.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im91b3RrbGl0aW9rd2FzZ2FvZ3FsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NDg3MTUsImV4cCI6MjA5MzMyNDcxNX0.W2SH0iKcvOgP4TeInA70tsUbAPOAnJqElfdS2Y4_fkk';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+/* ══════════════════════════════════════════════════════════
+   AUTH
+══════════════════════════════════════════════════════════ */
+let authMode = 'signin';
+let currentUser = null;
+
+function toggleAuthMode() {
+  authMode = authMode === 'signin' ? 'signup' : 'signin';
+  document.getElementById('auth-btn').textContent = authMode === 'signin' ? 'Sign in' : 'Create account';
+  document.getElementById('auth-toggle').innerHTML = authMode === 'signin'
+    ? 'No account? <a onclick="toggleAuthMode()">Create one</a>'
+    : 'Have an account? <a onclick="toggleAuthMode()">Sign in</a>';
+  document.getElementById('auth-err').textContent = '';
+}
+
+async function handleAuth() {
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+  const errEl = document.getElementById('auth-err');
+  const btn = document.getElementById('auth-btn');
+  if (!email || !password) { errEl.textContent = 'Please enter your email and password.'; return; }
+  btn.disabled = true; btn.textContent = '…'; errEl.textContent = '';
+  const fn = authMode === 'signin'
+    ? sb.auth.signInWithPassword({ email, password })
+    : sb.auth.signUp({ email, password });
+  const { data, error } = await fn;
+  btn.disabled = false;
+  btn.textContent = authMode === 'signin' ? 'Sign in' : 'Create account';
+  if (error) { errEl.textContent = error.message; return; }
+  if (authMode === 'signup' && !data.session) {
+    errEl.style.color = 'var(--sage)';
+    errEl.textContent = 'Check your email to confirm your account, then sign in.';
+    return;
+  }
+  if (data.session) bootApp(data.session.user);
+}
+
+async function signOut() {
+  await sb.auth.signOut();
+  currentUser = null; packagingData = []; productData = [];
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+async function bootApp(user) {
+  currentUser = user;
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('nav-user-email').textContent = user.email;
+  await loadAllData();
+}
+
+sb.auth.getSession().then(({ data }) => { if (data.session) bootApp(data.session.user); });
+
+/* ══════════════════════════════════════════════════════════
+   LOADING / TOAST
+══════════════════════════════════════════════════════════ */
+function setLoading(pct) { document.getElementById('loading-bar').style.width = pct + '%'; }
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+/* ══════════════════════════════════════════════════════════
+   CONSTANTS
+══════════════════════════════════════════════════════════ */
+const ATTR_LABELS = {
+  'color scheme':'Colour scheme','box shape':'Box shape','box size':'Box size',
+  'box orientation':'Orientation','box enclosure':'Enclosure','inner wrapping':'Inner wrap',
+  'art/style':'Art / style','branding':'Branding','typography':'Typography',
+  'structural design':'Structural design','material/finish':'Material / finish',
+  'storytelling':'Storytelling','sustainability':'Sustainability',
+  'unboxing experience':'Unboxing experience','shelf presence':'Shelf presence'
+};
+const ALL_ATTRS = Object.keys(ATTR_LABELS);
+
+// Keywords that suggest each attribute
+const ATTR_KEYWORDS = {
+  'color scheme': ['colour','color','palette','hue','tone','green','gold','dark','sage','cream','black','white','copper'],
+  'box shape': ['shape','box','rectangular','square','cylinder','hexagon'],
+  'box size': ['size','format','small','large','mini','standard','60g','50g','100g'],
+  'box orientation': ['portrait','landscape','tall','wide','upright'],
+  'box enclosure': ['fold','gate','tuck','magnetic','ribbon','seal','sleeve','drawer','wrap','opens','closing'],
+  'inner wrapping': ['inner','foil','wax','tissue','kraft','wrapper','inside','unwrap'],
+  'art/style': ['illustration','geometric','minimal','bold','typographic','painterly','art','design','style','graphic'],
+  'branding': ['brand','logo','wordmark','name','identity','typeface','font'],
+  'typography': ['type','font','typeface','serif','sans','tracking','hierarchy','text','lettering'],
+  'structural design': ['structure','gate-fold','reveal','unfold','opens','construction','engineering'],
+  'material/finish': ['matte','gloss','foil','emboss','deboss','texture','paper','stock','finish','material','tactile'],
+  'storytelling': ['story','narrative','origin','provenance','process','bean','cacao','history'],
+  'sustainability': ['sustainable','recycl','eco','kraft','compost','biodegradable'],
+  'unboxing experience': ['unbox','reveal','open','discover','moment','experience'],
+  'shelf presence': ['shelf','retail','stand out','notice','visible','display']
+};
+
+const BG_GRADIENTS = [
+  ['#1A2E1A','#C9963E'],['#1A1A2E','#A0673A'],['#2E1A1A','#C9963E'],
+  ['#1A2A2E','#8A9E7C'],['#2A1A2E','#C9963E'],['#2E2A1A','#6E8A6C'],
+  ['#1C2A1A','#D4AF37'],['#1A1C2E','#C4A95A'],['#2A1E1A','#9E7A4A']
+];
+
+const RATING_LABELS = { 1: 'Interesting', 2: 'Like', 3: 'Love' };
+
+/* ══════════════════════════════════════════════════════════
+   DATA
+══════════════════════════════════════════════════════════ */
+let packagingData = [];
+let productData = [];
+let customAttrOptions = {}; // { attribute: [values] }
+let packFilter = 'all', prodFilter = 'all';
+let currentArtStyle = '';
+let selectedGraphicEls = new Set();
+let currentFormat = '';
+let currentProfile = '';
+let currentClosure = '';
+let pendingImages = [null, null, null, null];
+let pendingImagePreviews = [null, null, null, null];
+let existingImageUrls = [null, null, null, null];
+let pendingColors = [];
+let tagRatings = {}; // { attr: 1|2|3 }
+let brandIdentityId = null;
+let brandSaveTimer = null;
+let ingRowCount = 0;
+
+/* ══════════════════════════════════════════════════════════
+   LOAD DATA
+══════════════════════════════════════════════════════════ */
+async function loadAllData() {
+  setLoading(20);
+  const [packRes, prodRes, brandRes, attrRes] = await Promise.all([
+    sb.from('packaging_concepts').select('*').order('created_at', { ascending: true }),
+    sb.from('products').select('*, ingredients(*)').order('created_at', { ascending: true }),
+    sb.from('brand_identity').select('*').limit(1).maybeSingle(),
+    sb.from('attribute_options').select('*')
+  ]);
+  setLoading(80);
+
+  if (packRes.data) {
+    packagingData = packRes.data.map(row => ({
+      id: row.id, name: row.brand, desc: row.product_description,
+      brand: row.brand, colors: row.colors ? JSON.parse(row.colors) : [],
+      // New fields with fallback to old field names for backwards compat
+      format: row.packaging_format || row.shape || null,
+      size: row.size, orient: row.orient,
+      profile: row.profile || null,
+      closure: row.closure_mechanism || row.enclosure || null,
+      inner: row.inner_wrap,
+      graphicElements: row.graphic_elements ? JSON.parse(row.graphic_elements) : [],
+      whatWorks: row.what_works, whatToBorrow: row.what_to_borrow,
+      whatDoesntWork: row.what_doesnt_work,
+      tagRatings: row.tag_ratings ? JSON.parse(row.tag_ratings) : {},
+      images: row.images ? JSON.parse(row.images) : [], bg: row.bg || 0
+    }));
+  }
+
+  if (prodRes.data) {
+    productData = prodRes.data.map(row => ({
+      id: row.id, name: row.name, tagline: row.tagline, cat: row.cat,
+      icon: row.icon, price: row.price,
+      images: row.images ? JSON.parse(row.images) : [],
+      recipe: row.recipe ? JSON.parse(row.recipe) : [],
+      notes: row.notes,
+      ingredients: (row.ingredients || []).map(i => ({
+        id: i.id, name: i.name, amount: i.amount,
+        cost: i.cost, supplier: i.supplier, moq: i.moq, url: i.url
+      }))
+    }));
+  }
+
+  if (attrRes.data) {
+    customAttrOptions = {};
+    attrRes.data.forEach(row => {
+      if (!customAttrOptions[row.attribute]) customAttrOptions[row.attribute] = [];
+      customAttrOptions[row.attribute].push(row.value);
+    });
+  }
+
+  if (brandRes.data) {
+    const b = brandRes.data;
+    const map = { 'bf-origin-story': 'origin_story', 'bf-mission': 'mission', 'bf-tone': 'tone_of_voice', 'bf-target': 'target_customer', 'bf-price': 'price_positioning', 'bf-design-notes': 'design_direction_notes' };
+    Object.entries(map).forEach(([id, key]) => { const el = document.getElementById(id); if (el && b[key]) el.value = b[key]; });
+    brandIdentityId = b.id;
+  }
+
+  setLoading(100);
+  setTimeout(() => setLoading(0), 400);
+  renderPackaging(packagingData);
+  renderProducts(productData);
+}
+
+/* ══════════════════════════════════════════════════════════
+   PACKAGING RENDER
+══════════════════════════════════════════════════════════ */
+function renderPackaging(data) {
+  const g = document.getElementById('pack-grid');
+  if (!data.length) {
+    g.innerHTML = `<div class="empty-state"><div class="empty-state-title">No concepts yet</div><div class="empty-state-sub">Hit "+ Add Concept" to start cataloguing packaging references.</div></div>`;
+    updatePackStats(); return;
+  }
+  g.innerHTML = data.map(p => {
+    const bg = BG_GRADIENTS[p.bg % BG_GRADIENTS.length];
+    const src = p.images && p.images[0];
+    const ratings = p.tagRatings || {};
+    const ratedAttrs = Object.entries(ratings).filter(([,v]) => v > 0).sort((a,b) => b[1]-a[1]);
+    return `<div class="pack-card" onclick="openDetail('${p.id}')">
+      ${src ? `<img class="pack-thumb" src="${src}" alt="${p.brand}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">` : ''}
+      <div class="pack-thumb-placeholder" style="background:linear-gradient(135deg,${bg[0]} 0%,${bg[1]} 100%);${src?'display:none':''}">
+        ${p.brand || 'Concept'}
+      </div>
+      <div class="pack-card-body">
+        <div class="pack-card-name">${p.brand || '—'}</div>
+        ${p.desc ? `<div class="pack-card-desc">${p.desc}</div>` : ''}
+        <div class="swatches">${(p.colors||[]).map(c=>`<div class="swatch" style="background:${c}" title="${c}"></div>`).join('')}</div>
+        ${ratedAttrs.length ? `<div class="tag-rating-strip">${ratedAttrs.slice(0,4).map(([attr,rating])=>`
+          <span class="tag-rating-pill r${rating}">
+            <span class="tag-rating-dot"></span>
+            ${ATTR_LABELS[attr]||attr}
+          </span>`).join('')}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+  updatePackStats();
+}
+
+/* ══════════════════════════════════════════════════════════
+   DETAIL PANEL
+══════════════════════════════════════════════════════════ */
+function openDetail(id) {
+  const p = packagingData.find(x => x.id === id); if (!p) return;
+  document.getElementById('detail-name').textContent = p.brand || '—';
+  document.getElementById('detail-desc').textContent = p.desc || '';
+
+  // Tag ratings
+  const ratings = p.tagRatings || {};
+  const ratedAttrs = Object.entries(ratings).filter(([,v]) => v > 0).sort((a,b) => b[1]-a[1]);
+  document.getElementById('detail-tags').innerHTML = ratedAttrs.map(([attr, rating]) =>
+    `<span class="tag-rating-pill r${rating}"><span class="tag-rating-dot"></span>${ATTR_LABELS[attr]||attr} — ${RATING_LABELS[rating]}</span>`).join('');
+
+  // Structured notes
+  const notesBlock = document.getElementById('detail-notes-block');
+  const noteItems = [
+    ['What works', p.whatWorks],
+    ['What to borrow for Evoke', p.whatToBorrow],
+    ["What doesn't work", p.whatDoesntWork]
+  ].filter(([,v]) => v);
+  const graphicEls = p.graphicElements && p.graphicElements.length
+    ? `<div class="detail-notes-item"><div class="detail-notes-label">Graphic elements</div><div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:4px">${p.graphicElements.map(el=>`<span style="padding:2px 9px;border-radius:999px;background:var(--parchment);font-size:10px;color:var(--cocoa)">${el}</span>`).join('')}</div></div>`
+    : '';
+  notesBlock.innerHTML = graphicEls + noteItems.map(([label, text]) => `
+    <div class="detail-notes-item">
+      <div class="detail-notes-label">${label}</div>
+      <div class="detail-notes-text">${text}</div>
+    </div>`).join('');
+
+  // Attributes table
+  const attrs = [
+    ['Colour scheme', `<div class="color-swatches-row">${(p.colors||[]).map(c=>`<div class="swatch" style="background:${c};width:18px;height:18px" title="${c}"></div>`).join('')}</div>`],
+    ['Format', p.format||'—'], ['Size', p.size||'—'],
+    ['Orientation', p.orient||'—'], ['Profile', p.profile||'—'],
+    ['Closure', p.closure||'—'], ['Inner wrap', p.inner||'—'],
+  ];
+  document.getElementById('detail-attrs').innerHTML = attrs.map(([label, val]) =>
+    `<tr class="attr-row"><td class="attr-label">${label}</td><td class="attr-val">${val}</td></tr>`).join('');
+
+  // Images
+  const imgs = (p.images||[]).filter(Boolean);
+  document.getElementById('detail-images').innerHTML = [0,1,2,3].map(i =>
+    imgs[i]
+      ? `<div class="detail-img-wrap" onclick="openLightbox('${imgs[i]}')"><img src="${imgs[i]}" alt="" onerror="this.parentElement.innerHTML='<div class=detail-img-ph><span>⚠</span><span style=font-size:9px>Not found</span></div>'"></div>`
+      : `<div class="detail-img-ph"><span style="font-size:18px;color:var(--border-md)">+</span><span>Photo ${i+1}</span></div>`
+  ).join('');
+
+  document.getElementById('detail-overlay').classList.add('open');
+  currentDetailId = id;
+}
+
+let currentDetailId = null;
+let editingPackId = null; // tracks which packaging concept is being edited
+
+function closeDetail() { document.getElementById('detail-overlay').classList.remove('open'); currentDetailId = null; }
+function openLightbox(src) { document.getElementById('lightbox-img').src = src; document.getElementById('lightbox').classList.add('open'); }
+function closeLightbox() { document.getElementById('lightbox').classList.remove('open'); }
+
+async function deletePackagingConcept() {
+  if (!currentDetailId) return;
+  if (!confirm('Delete this concept? This cannot be undone.')) return;
+  const { error } = await sb.from('packaging_concepts').delete().eq('id', currentDetailId);
+  if (error) { showToast('Error — ' + error.message); return; }
+  showToast('Concept deleted');
+  closeDetail();
+  await loadAllData();
+}
+
+async function editPackagingConcept() {
+  if (!currentDetailId) return;
+  const p = packagingData.find(x => x.id === currentDetailId); if (!p) return;
+  const editId = currentDetailId;
+  closeDetail();
+  openPackModal();
+  setTimeout(() => {
+    document.getElementById('p-brand').value = p.brand || '';
+    document.getElementById('p-desc').value = p.desc || '';
+    document.getElementById('p-what-works').value = p.whatWorks || '';
+    document.getElementById('p-what-to-borrow').value = p.whatToBorrow || '';
+    document.getElementById('p-what-doesnt-work').value = p.whatDoesntWork || '';
+
+    // Restore dropdowns
+    ['p-size','p-orient','p-inner'].forEach(id => {
+      const valMap = {'p-size':'size','p-orient':'orient','p-inner':'inner'};
+      const val = p[valMap[id]];
+      if (val) {
+        const sel = document.getElementById(id);
+        if (!sel) return;
+        let found = false;
+        Array.from(sel.options).forEach(o => { if (o.value === val) { sel.value = val; found = true; } });
+        if (!found) { const opt = document.createElement('option'); opt.value = val; opt.textContent = val; sel.insertBefore(opt, sel.lastElementChild); sel.value = val; }
+      }
+    });
+
+    // Restore format visual selector
+    if (p.format) {
+      currentFormat = p.format;
+      const fBtn = document.querySelector(`#format-grid .attr-visual-opt[data-val="${p.format}"]`);
+      if (fBtn) fBtn.classList.add('selected');
+    }
+
+    // Restore profile visual selector
+    if (p.profile) {
+      currentProfile = p.profile;
+      document.querySelectorAll('.attr-visual-opt').forEach(el => {
+        if (el.dataset.val === p.profile) el.classList.add('selected');
+      });
+    }
+
+    // Restore closure visual selector
+    if (p.closure) {
+      currentClosure = p.closure;
+      document.querySelectorAll('.attr-visual-opt').forEach(el => {
+        if (el.dataset.val === p.closure) el.classList.add('selected');
+      });
+    }
+
+    // Restore graphic elements
+    selectedGraphicEls = new Set(p.graphicElements || []);
+    document.querySelectorAll('.graphic-el-btn').forEach(el => {
+      if (selectedGraphicEls.has(el.textContent.trim())) el.classList.add('selected');
+    });
+
+    pendingColors = [...(p.colors || [])];
+    renderColorStrip();
+    tagRatings = { ...(p.tagRatings || {}) };
+    renderTagUI();
+
+    existingImageUrls = [...(p.images || [])];
+    existingImageUrls.forEach((url, i) => {
+      if (!url) return;
+      const slot = document.getElementById('img-slot-'+i);
+      let img = slot.querySelector('img');
+      if (!img) { img = document.createElement('img'); slot.prepend(img); }
+      img.src = url; slot.classList.add('has-image');
+    });
+
+    editingPackId = editId;
+    document.getElementById('pack-submit-btn').textContent = 'Update Concept';
+  }, 100);
+}
+
+/* ══════════════════════════════════════════════════════════
+   PACK STATS & DIRECTION SYNTHESIS
+══════════════════════════════════════════════════════════ */
+function updatePackStats() {
+  document.getElementById('pack-count').textContent = packagingData.length;
+  document.getElementById('art-count').textContent = new Set(packagingData.map(p=>p.art).filter(Boolean)).size;
+
+  // Weighted attribute scores (Love=3pts, Like=2pts, Interesting=1pt)
+  const scores = {};
+  const counts = {};
+  packagingData.forEach(p => {
+    Object.entries(p.tagRatings || {}).forEach(([attr, rating]) => {
+      if (rating > 0) {
+        scores[attr] = (scores[attr] || 0) + rating;
+        counts[attr] = (counts[attr] || 0) + 1;
+      }
+    });
+  });
+
+  const top = Object.entries(scores).sort((a,b) => b[1]-a[1])[0];
+  document.getElementById('top-attr').textContent = top ? `${ATTR_LABELS[top[0]]||top[0]}` : '—';
+
+  // Attribute ratings panel
+  const likedEl = document.getElementById('liked-summary');
+  if (!Object.keys(scores).length) {
+    likedEl.innerHTML = '<div style="font-size:12px;color:var(--muted)">No ratings yet.</div>';
+  } else {
+    const sorted = Object.entries(scores).sort((a,b) => b[1]-a[1]);
+    const max = sorted[0][1];
+    likedEl.innerHTML = sorted.map(([k, score]) => {
+      const avg = score / counts[k];
+      const fillClass = avg >= 2.5 ? 'liked-insight-fill-3' : avg >= 1.5 ? 'liked-insight-fill-2' : 'liked-insight-fill-1';
+      return `<div class="liked-insight-row">
+        <span class="liked-insight-name">${ATTR_LABELS[k]||k}</span>
+        <div class="liked-insight-bar"><div class="${fillClass}" style="width:${Math.round((score/max)*100)}%"></div></div>
+        <span class="liked-insight-score">${avg >= 2.5 ? '♥♥♥' : avg >= 1.5 ? '♥♥' : '♥'}</span>
+      </div>`;
+    }).join('');
+  }
+
+  // Breakdown panel
+  const bdEl = document.getElementById('dir-breakdown');
+  if (!packagingData.length) {
+    bdEl.innerHTML = '<div style="font-size:12px;color:var(--muted)">No concepts yet.</div>';
+  } else {
+    const artCounts = {}, enclosureCounts = {}, innerCounts = {};
+    packagingData.forEach(p => {
+      if (p.art) artCounts[p.art] = (artCounts[p.art]||0)+1;
+      if (p.enclosure) enclosureCounts[p.enclosure] = (enclosureCounts[p.enclosure]||0)+1;
+      if (p.inner) innerCounts[p.inner] = (innerCounts[p.inner]||0)+1;
+    });
+    const topArt = Object.entries(artCounts).sort((a,b)=>b[1]-a[1])[0];
+    const topEnc = Object.entries(enclosureCounts).sort((a,b)=>b[1]-a[1])[0];
+    const topInn = Object.entries(innerCounts).sort((a,b)=>b[1]-a[1])[0];
+    const allColors = [...new Set(packagingData.flatMap(p=>p.colors||[]))];
+    bdEl.innerHTML = `
+      <div class="breakdown-row"><span class="breakdown-key">Concepts</span><span class="breakdown-val">${packagingData.length}</span></div>
+      <div class="breakdown-row"><span class="breakdown-key">Dominant style</span><span class="breakdown-val">${topArt?topArt[0]:'—'}</span></div>
+      <div class="breakdown-row"><span class="breakdown-key">Top enclosure</span><span class="breakdown-val">${topEnc?topEnc[0]:'—'}</span></div>
+      <div class="breakdown-row"><span class="breakdown-key">Top inner wrap</span><span class="breakdown-val">${topInn?topInn[0]:'—'}</span></div>
+      <div class="breakdown-row"><span class="breakdown-key">Colours in pool</span><span class="breakdown-val">${allColors.length}</span></div>`;
+  }
+
+  // Insights hero
+  const heroEl = document.getElementById('dir-insights-hero');
+  if (!packagingData.length || !Object.keys(scores).length) {
+    heroEl.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:20px 0">Add packaging concepts and rate attributes to see insights here.</div>';
+    return;
+  }
+  const topAttrs = Object.entries(scores).sort((a,b)=>b[1]-a[1]).slice(0,4);
+  const allColors = [...new Set(packagingData.flatMap(p=>p.colors||[]))].slice(0,8);
+
+  // Gather "what to borrow" snippets
+  const borrowSnippets = packagingData.filter(p=>p.whatToBorrow).map(p=>`<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--ink);line-height:1.5"><span style="font-size:10px;color:var(--muted);display:block;margin-bottom:2px">${p.brand}</span>${p.whatToBorrow}</div>`);
+
+  heroEl.innerHTML = `
+    <div class="dir-insights-strip">
+      ${topAttrs.map(([k,score])=>`
+        <div class="dir-insight-card">
+          <div class="dir-insight-label">Top rated</div>
+          <div class="dir-insight-value">${ATTR_LABELS[k]||k}</div>
+          <div class="dir-insight-sub">Score: ${score} across ${counts[k]} concept${counts[k]>1?'s':''}</div>
+        </div>`).join('')}
+    </div>
+    ${allColors.length ? `
+    <div class="dir-card" style="margin-bottom:16px">
+      <h3>Colour territory across catalogue</h3>
+      <div class="dir-color-strip">${allColors.map(c=>`<div class="dir-color-chip" style="background:${c}" title="${c}"></div>`).join('')}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:18px">${allColors.join(' · ')}</div>
+    </div>` : ''}
+    ${borrowSnippets.length ? `
+    <div class="dir-card" style="margin-bottom:0">
+      <h3>What to borrow for Evoke — across all references</h3>
+      ${borrowSnippets.join('')}
+    </div>` : ''}
+  `;
+}
+
+/* ══════════════════════════════════════════════════════════
+   MODAL — OPEN & IMAGE HANDLING
+══════════════════════════════════════════════════════════ */
+function openPackModal() {
+  // Reset all state
+  pendingImages = [null,null,null,null];
+  pendingImagePreviews = [null,null,null,null];
+  existingImageUrls = [null,null,null,null];
+  pendingColors = [];
+  tagRatings = {};
+  currentArtStyle = '';
+  editingPackId = null;
+  selectedGraphicEls = new Set();
+  currentFormat = ''; currentProfile = ''; currentClosure = '';
+  ['p-brand','p-desc','p-what-works','p-what-to-borrow','p-what-doesnt-work',
+   'p-format-custom-val','p-profile-custom-val','p-closure-custom-val'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  ['p-size','p-orient','p-inner'].forEach(id => document.getElementById(id).selectedIndex = 0);
+  ['p-format','p-profile','p-closure'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  document.querySelectorAll('.attr-visual-opt').forEach(el => el.classList.remove('selected'));
+  document.querySelectorAll('.graphic-el-btn').forEach(el => el.classList.remove('selected'));
+  [0,1,2,3].forEach(i => {
+    const slot = document.getElementById('img-slot-'+i);
+    slot.classList.remove('has-image');
+    const img = slot.querySelector('img'); if (img) img.remove();
+    document.getElementById('img-file-'+i).value = '';
+  });
+  renderColorStrip();
+  renderTagUI();
+  document.getElementById('modal-pack').classList.add('open');
+}
+
+function triggerUpload(i) {
+  if (!document.getElementById('img-slot-'+i).classList.contains('has-image')) {
+    document.getElementById('img-file-'+i).click();
+  }
+}
+
+async function handleImageFile(i, input) {
+  if (!input.files || !input.files[0]) return;
+  const file = input.files[0];
+  pendingImages[i] = file;
+  const reader = new FileReader();
+  reader.onload = e => {
+    pendingImagePreviews[i] = e.target.result;
+    const slot = document.getElementById('img-slot-'+i);
+    let img = slot.querySelector('img');
+    if (!img) { img = document.createElement('img'); slot.prepend(img); }
+    img.src = e.target.result;
+    slot.classList.add('has-image');
+    // Auto-extract dominant colours from first image
+    if (i === 0) extractColors(e.target.result);
+    else mergeColors(e.target.result);
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeImage(e, i) {
+  e.stopPropagation();
+  pendingImages[i] = null;
+  pendingImagePreviews[i] = null;
+  const slot = document.getElementById('img-slot-'+i);
+  slot.classList.remove('has-image');
+  const img = slot.querySelector('img'); if (img) img.remove();
+  document.getElementById('img-file-'+i).value = '';
+}
+
+function extractColors(dataUrl) {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  const img = new Image();
+  img.onload = () => {
+    const srcW = img.width, srcH = img.height;
+    const cropX = srcW * 0.20, cropY = srcH * 0.20;
+    const cropW = srcW * 0.60, cropH = srcH * 0.60;
+    canvas.width = 60; canvas.height = 60;
+    ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, 60, 60);
+    const data = ctx.getImageData(0, 0, 60, 60).data;
+    const colorMap = {};
+    for (let i = 0; i < data.length; i += 12) {
+      const r = data[i], g = data[i+1], b = data[i+2];
+      if (data[i+3] < 128) continue;
+      const brightness = (r + g + b) / 3;
+      if (brightness > 230 || brightness < 20) continue;
+      const qr = Math.round(r/24)*24, qg = Math.round(g/24)*24, qb = Math.round(b/24)*24;
+      const key = `${qr},${qg},${qb}`;
+      colorMap[key] = (colorMap[key]||0) + 1;
+    }
+    const sorted = Object.entries(colorMap).sort((a,b)=>b[1]-a[1]);
+    const selected = [];
+    for (const [key] of sorted) {
+      const [r,g,b] = key.split(',').map(Number);
+      const tooClose = selected.some(([sr,sg,sb]) => Math.abs(r-sr) < 40 && Math.abs(g-sg) < 40 && Math.abs(b-sb) < 40);
+      if (!tooClose) selected.push([r,g,b]);
+      if (selected.length >= 6) break;
+    }
+    pendingColors = selected.map(([r,g,b]) => `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`);
+    renderColorStrip();
+  };
+  img.src = dataUrl;
+}
+
+// Merge colours from additional photos into the existing set
+function mergeColors(dataUrl) {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  const img = new Image();
+  img.onload = () => {
+    const srcW = img.width, srcH = img.height;
+    const cropX = srcW * 0.20, cropY = srcH * 0.20;
+    const cropW = srcW * 0.60, cropH = srcH * 0.60;
+    canvas.width = 60; canvas.height = 60;
+    ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, 60, 60);
+    const data = ctx.getImageData(0, 0, 60, 60).data;
+    const colorMap = {};
+    for (let i = 0; i < data.length; i += 12) {
+      const r = data[i], g = data[i+1], b = data[i+2];
+      if (data[i+3] < 128) continue;
+      const brightness = (r + g + b) / 3;
+      if (brightness > 230 || brightness < 20) continue;
+      const qr = Math.round(r/24)*24, qg = Math.round(g/24)*24, qb = Math.round(b/24)*24;
+      const key = `${qr},${qg},${qb}`;
+      colorMap[key] = (colorMap[key]||0) + 1;
+    }
+    // Parse existing colours into [r,g,b] arrays
+    const existing = pendingColors.map(hex => {
+      const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+      return [r,g,b];
+    });
+    // Add new colours that are visually distinct from what we already have
+    const sorted = Object.entries(colorMap).sort((a,b)=>b[1]-a[1]);
+    for (const [key] of sorted) {
+      const [r,g,b] = key.split(',').map(Number);
+      const tooClose = existing.some(([er,eg,eb]) => Math.abs(r-er) < 40 && Math.abs(g-eg) < 40 && Math.abs(b-eb) < 40);
+      if (!tooClose) {
+        existing.push([r,g,b]);
+        pendingColors.push(`#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`);
+      }
+      if (pendingColors.length >= 8) break;
+    }
+    renderColorStrip();
+  };
+  img.src = dataUrl;
+}
+
+function renderColorStrip() {
+  const strip = document.getElementById('color-strip');
+  strip.innerHTML = pendingColors.map((c,i) => `
+    <div class="color-chip-wrap">
+      <div class="color-chip" style="background:${c}" title="${c}"></div>
+      <div class="color-chip-remove" onclick="removeColor(${i})">×</div>
+    </div>`).join('') +
+    `<button class="add-color-btn" onclick="addManualColor()">+ Add colour</button>`;
+}
+
+function removeColor(i) { pendingColors.splice(i,1); renderColorStrip(); }
+
+function addManualColor() {
+  const input = document.createElement('input');
+  input.type = 'color'; input.value = '#C9963E';
+  input.onchange = () => { pendingColors.push(input.value); renderColorStrip(); };
+  input.click();
+}
+
+/* ══════════════════════════════════════════════════════════
+   ART STYLE SELECTOR
+══════════════════════════════════════════════════════════ */
+function selectAttr(el, hiddenId, val) {
+  const grid = el.closest('.attr-visual-grid') || el.parentElement;
+  grid.querySelectorAll('.attr-visual-opt').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  const hidden = document.getElementById(hiddenId);
+  if (hidden) hidden.value = val;
+  if (hiddenId === 'p-format') currentFormat = val;
+  if (hiddenId === 'p-profile') currentProfile = val;
+  if (hiddenId === 'p-closure') currentClosure = val;
+}
+
+function selectAttrCustom(hiddenId, inputId) {
+  const val = document.getElementById(inputId).value.trim();
+  if (!val) return;
+  // Deselect any visual options in the same section
+  const inputEl = document.getElementById(inputId);
+  const section = inputEl.closest('.modal-section') || inputEl.closest('.fg');
+  if (section) section.querySelectorAll('.attr-visual-opt').forEach(o => o.classList.remove('selected'));
+  const hidden = document.getElementById(hiddenId);
+  if (hidden) hidden.value = val;
+  if (hiddenId === 'p-format') currentFormat = val;
+  if (hiddenId === 'p-profile') currentProfile = val;
+  if (hiddenId === 'p-closure') currentClosure = val;
+  // Clear the input after use
+  inputEl.value = '';
+  inputEl.style.borderColor = 'var(--sage)';
+  setTimeout(() => { inputEl.style.borderColor = ''; }, 1000);
+}
+
+function toggleGraphicEl(el, val) {
+  if (selectedGraphicEls.has(val)) { selectedGraphicEls.delete(val); el.classList.remove('selected'); }
+  else { selectedGraphicEls.add(val); el.classList.add('selected'); }
+}
+
+/* ══════════════════════════════════════════════════════════
+   SMART SELECTS — custom options
+══════════════════════════════════════════════════════════ */
+function onAttrChange() {
+  ['p-size','p-orient','p-inner'].forEach(id => {
+    const sel = document.getElementById(id);
+    const customRow = document.getElementById(id+'-custom');
+    if (customRow) customRow.style.display = (sel && (sel.value === 'Other…' || sel.value === 'Custom')) ? 'flex' : 'none';
+  });
+}
+
+async function addCustomOption(selectId, inputId, attrKey) {
+  const val = document.getElementById(inputId).value.trim();
+  if (!val) return;
+  const sel = document.getElementById(selectId);
+  const opt = document.createElement('option');
+  opt.value = val; opt.textContent = val;
+  sel.insertBefore(opt, sel.lastElementChild);
+  sel.value = val;
+  document.getElementById(selectId+'-custom').style.display = 'none';
+  // Save to Supabase
+  await sb.from('attribute_options').insert({ user_id: currentUser.id, attribute: attrKey, value: val });
+  if (!customAttrOptions[attrKey]) customAttrOptions[attrKey] = [];
+  customAttrOptions[attrKey].push(val);
+  updateTagSuggestions();
+}
+
+/* ══════════════════════════════════════════════════════════
+   TAG RATING SYSTEM
+══════════════════════════════════════════════════════════ */
+function updateTagSuggestions() {
+  // Only render if tag UI is empty — never re-render once ratings exist
+  const container = document.getElementById('tag-rating-ui');
+  if (!container || container.children.length === 0) {
+    renderTagUI();
+  }
+}
+
+function renderTagUI(suggested = new Set()) {
+  const container = document.getElementById('tag-rating-ui');
+  // Show suggested first, then remaining
+  const attrsToShow = [...new Set([...suggested, ...Object.keys(tagRatings).filter(k => tagRatings[k] > 0)])];
+  const remaining = ALL_ATTRS.filter(a => !attrsToShow.includes(a));
+  const allAttrs = [...attrsToShow, ...remaining];
+
+  container.innerHTML = `<div class="tag-items" style="flex-wrap:wrap;display:flex;gap:6px">
+    ${allAttrs.map(attr => {
+      const rating = tagRatings[attr] || 0;
+      return `<div class="tag-item">
+        <span class="tag-item-name">${ATTR_LABELS[attr]||attr}</span>
+        <div class="tag-rating-btns">
+          <button class="tag-rating-btn${rating===1?' active-1':''}" data-attr-rating="${attr}" data-rating="1" onclick="setTagRating('${attr}',1)" title="Interesting">1</button>
+          <button class="tag-rating-btn${rating===2?' active-2':''}" data-attr-rating="${attr}" data-rating="2" onclick="setTagRating('${attr}',2)" title="Like">2</button>
+          <button class="tag-rating-btn${rating===3?' active-3':''}" data-attr-rating="${attr}" data-rating="3" onclick="setTagRating('${attr}',3)" title="Love">3</button>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function setTagRating(attr, rating) {
+  const current = tagRatings[attr] || 0;
+  tagRatings[attr] = current === rating ? 0 : rating;
+  const newRating = tagRatings[attr];
+  // Update button classes directly without re-rendering the whole UI
+  document.querySelectorAll(`[data-attr-rating="${attr}"]`).forEach(btn => {
+    const r = parseInt(btn.dataset.rating);
+    btn.className = `tag-rating-btn${newRating===r?' active-'+r:''}`;
+  });
+}
+
+/* ══════════════════════════════════════════════════════════
+   SAVE PACKAGING
+══════════════════════════════════════════════════════════ */
+let isSavingPack = false;
+
+async function savePackagingConcept() {
+  if (isSavingPack) return;
+  const brand = document.getElementById('p-brand').value.trim();
+  if (!brand) { showToast('Please enter a brand name'); return; }
+  const btn = document.getElementById('pack-submit-btn');
+  const editingId = editingPackId; // snapshot before any async ops
+  isSavingPack = true;
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  // Build final image URL array — start with existing, replace slots that have new uploads
+  const imageUrls = [...existingImageUrls];
+  for (let i = 0; i < 4; i++) {
+    if (pendingImages[i]) {
+      const file = pendingImages[i];
+      const path = `${currentUser.id}/${Date.now()}-${i}-${file.name.replace(/\s+/g,'_')}`;
+      const { error } = await sb.storage.from('packaging-images').upload(path, file);
+      if (!error) {
+        const { data: urlData } = sb.storage.from('packaging-images').getPublicUrl(path);
+        imageUrls[i] = urlData.publicUrl;
+      }
+    }
+  }
+
+  const row = {
+    user_id: currentUser.id,
+    brand,
+    product_description: document.getElementById('p-desc').value,
+    colors: JSON.stringify(pendingColors),
+    packaging_format: currentFormat,
+    size: document.getElementById('p-size').value,
+    orient: document.getElementById('p-orient').value,
+    profile: currentProfile,
+    closure_mechanism: currentClosure,
+    inner_wrap: document.getElementById('p-inner').value,
+    graphic_elements: JSON.stringify([...selectedGraphicEls]),
+    what_works: document.getElementById('p-what-works').value,
+    what_to_borrow: document.getElementById('p-what-to-borrow').value,
+    what_doesnt_work: document.getElementById('p-what-doesnt-work').value,
+    tag_ratings: JSON.stringify(tagRatings),
+    images: JSON.stringify(imageUrls.filter(Boolean)),
+    bg: Math.floor(Math.random() * BG_GRADIENTS.length)
+  };
+
+  let error;
+  if (editingId) {
+    ({ error } = await sb.from('packaging_concepts').update(row).eq('id', editingId));
+  } else {
+    ({ error } = await sb.from('packaging_concepts').insert(row));
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Save Concept';
+  editingPackId = null;
+  isSavingPack = false;
+  if (error) { showToast('Error — ' + error.message); return; }
+  showToast(editingId ? 'Concept updated ✦' : 'Concept saved ✦');
+  closeModal('modal-pack');
+  await loadAllData();
+}
+
+/* ══════════════════════════════════════════════════════════
+   PRODUCTS
+══════════════════════════════════════════════════════════ */
+function renderProducts(data) {
+  const list = document.getElementById('product-list');
+  if (!data.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-state-title">No products yet</div><div class="empty-state-sub">Hit "+ Add Product" to build your catalogue.</div></div>`;
+    updateProdStats([]); return;
+  }
+  list.innerHTML = data.map(p => {
+    const totalCogs = (p.ingredients||[]).reduce((s,i)=>s+(parseFloat(i.cost)||0),0);
+    const imgs = (p.images||[]).filter(Boolean);
+    const photoStrip = imgs.length ? `<div class="prod-photo-strip">${[0,1,2,3].map(i=>
+      imgs[i] ? `<div class="prod-photo-wrap" onclick="openLightbox('${imgs[i]}')"><img src="${imgs[i]}" alt="" onerror="this.parentElement.innerHTML='<div class=prod-photo-ph><span>⚠</span><span style=font-size:9px>Not found</span></div>'"></div>`
+              : `<div class="prod-photo-ph"><span style="font-size:14px;color:var(--border-md)">+</span><span>Photo ${i+1}</span></div>`
+    ).join('')}</div>` : '';
+    return `<div class="product-card">
+      <div class="product-card-head" onclick="toggleProduct('${p.id}')">
+        <div class="product-icon">${p.icon||'🍫'}</div>
+        <div><div class="product-name">${p.name}</div><div class="product-tagline">${p.tagline||''}</div></div>
+        <div class="product-chips">
+          <span class="chip chip-cat">${p.cat}</span>
+          ${totalCogs>0?`<span class="chip chip-cogs">$${totalCogs.toFixed(2)} COGS</span>`:''}
+          ${p.price>0?`<span class="chip chip-price">$${parseFloat(p.price).toFixed(2)} retail</span>`:''}
+        </div>
+        <button class="product-edit-btn" onclick="event.stopPropagation();editProduct('${p.id}')">Edit</button>
+      </div>
+      <div class="product-expand" id="expand-${p.id}">
+        ${photoStrip}
+        <div class="prod-expand-body">
+          <div class="expand-section">
+            <h4>Ingredients &amp; Sourcing</h4>
+            ${(p.ingredients||[]).length ? `
+              <table class="ing-display">
+                <thead><tr><th>Ingredient</th><th>Amount</th><th>Cost</th><th>Sourcing</th></tr></thead>
+                <tbody>${(p.ingredients||[]).map(i=>{
+                  let src='';
+                  if(i.supplier) src+=`<span style="font-size:12px;display:block">${i.supplier}</span>`;
+                  if(i.moq) src+=`<span class="ing-source-meta">MOQ: ${i.moq}</span><br>`;
+                  if(i.url){try{src+=`<a class="ing-source-link" href="${i.url}" target="_blank" onclick="event.stopPropagation()">${new URL(i.url).hostname}</a>`;}catch(e){src+=`<a class="ing-source-link" href="${i.url}" target="_blank">${i.url}</a>`;}}
+                  return `<tr><td><strong>${i.name||'—'}</strong></td><td>${i.amount||'—'}</td><td>${i.cost?'$'+parseFloat(i.cost).toFixed(2):'—'}</td><td>${src||'—'}</td></tr>`;
+                }).join('')}</tbody>
+              </table>
+              ${totalCogs>0?`<div class="cogs-total"><span>Total COGS</span><span>$${totalCogs.toFixed(2)}</span></div>`:''}` :
+              '<div style="font-size:12px;color:var(--muted)">No ingredients yet.</div>'}
+          </div>
+          <div class="expand-section">
+            <h4>Recipe</h4>
+            ${(p.recipe||[]).length ? (p.recipe||[]).map((s,i)=>`<div class="recipe-step"><div class="step-num">${i+1}</div><span>${s}</span></div>`).join('') : '<div style="font-size:12px;color:var(--muted)">No recipe steps yet.</div>'}
+          </div>
+          <div class="expand-section">
+            <h4>Notes</h4>
+            <div style="font-size:12px;color:var(--muted);line-height:1.7">${p.notes||'—'}</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  updateProdStats(data);
+}
+
+function updateProdStats(data) {
+  document.getElementById('prod-count').textContent = productData.length;
+  document.getElementById('cat-count').textContent = new Set(productData.map(p=>p.cat).filter(Boolean)).size;
+  const cogsArr = data.map(p=>(p.ingredients||[]).reduce((s,i)=>s+(parseFloat(i.cost)||0),0)).filter(v=>v>0);
+  document.getElementById('avg-cogs').textContent = cogsArr.length ? '$'+(cogsArr.reduce((a,b)=>a+b,0)/cogsArr.length).toFixed(2) : '—';
+}
+
+function toggleProduct(id) { document.getElementById('expand-'+id).classList.toggle('open'); }
+
+/* ══════════════════════════════════════════════════════════
+   INGREDIENT BUILDER
+══════════════════════════════════════════════════════════ */
+function addIngRow(data) {
+  const id = ingRowCount++;
+  const d = data||{};
+  const row = document.createElement('div');
+  row.className='ing-row'; row.id='ing-row-'+id;
+  row.innerHTML=`<div class="ing-cell"><input placeholder="e.g. Cacao paste" value="${d.name||''}"></div><div class="ing-cell"><input placeholder="60g" value="${d.amount||''}"></div><div class="ing-cell"><input placeholder="1.20" type="number" step="0.01" value="${d.cost||''}"></div><div class="ing-cell"><input placeholder="Supplier" value="${d.supplier||''}"></div><div class="ing-cell"><input placeholder="25kg" value="${d.moq||''}"></div><div class="ing-cell"><input placeholder="https://…" value="${d.url||''}"></div><button class="ing-remove" onclick="document.getElementById('ing-row-${id}').remove()">×</button>`;
+  document.getElementById('ing-rows').appendChild(row);
+}
+function getIngredients() {
+  return Array.from(document.querySelectorAll('#ing-rows .ing-row')).map(row=>{
+    const inputs = row.querySelectorAll('input');
+    return {name:inputs[0].value.trim(),amount:inputs[1].value.trim(),cost:parseFloat(inputs[2].value)||0,supplier:inputs[3].value.trim(),moq:inputs[4].value.trim(),url:inputs[5].value.trim()};
+  }).filter(i=>i.name);
+}
+function clearIngRows() { document.getElementById('ing-rows').innerHTML=''; ingRowCount=0; }
+
+/* ══════════════════════════════════════════════════════════
+   PRODUCT MODAL
+══════════════════════════════════════════════════════════ */
+function openProductModal() {
+  document.getElementById('prod-modal-title').textContent='Add Product';
+  document.getElementById('prod-submit-btn').textContent='Save Product';
+  document.getElementById('pr-editing-id').value='';
+  ['pr-name','pr-tagline','pr-price','pr-icon','pr-recipe','pr-notes','pr-img-0','pr-img-1','pr-img-2','pr-img-3'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('pr-cat').selectedIndex=0;
+  clearIngRows(); addIngRow();
+  document.getElementById('modal-product').classList.add('open');
+}
+function editProduct(id) {
+  const p = productData.find(x=>x.id===id); if (!p) return;
+  document.getElementById('prod-modal-title').textContent='Edit Product';
+  document.getElementById('prod-submit-btn').textContent='Update Product';
+  document.getElementById('pr-editing-id').value=id;
+  document.getElementById('pr-name').value=p.name||'';
+  document.getElementById('pr-tagline').value=p.tagline||'';
+  document.getElementById('pr-price').value=p.price||'';
+  document.getElementById('pr-icon').value=p.icon||'';
+  document.getElementById('pr-recipe').value=(p.recipe||[]).join('\n');
+  document.getElementById('pr-notes').value=p.notes||'';
+  const imgs=p.images||[];
+  [0,1,2,3].forEach(i=>{document.getElementById('pr-img-'+i).value=imgs[i]||'';});
+  const catEl=document.getElementById('pr-cat');
+  Array.from(catEl.options).forEach((o,i)=>{if(o.value===p.cat)catEl.selectedIndex=i;});
+  clearIngRows();
+  (p.ingredients||[]).forEach(ing=>addIngRow(ing));
+  if(!(p.ingredients||[]).length) addIngRow();
+  document.getElementById('modal-product').classList.add('open');
+}
+function closeProductModal() { document.getElementById('modal-product').classList.remove('open'); }
+
+async function saveProduct() {
+  const name=document.getElementById('pr-name').value.trim(); if (!name) return;
+  const btn=document.getElementById('prod-submit-btn');
+  btn.disabled=true; btn.textContent='Saving…';
+  const editingId=document.getElementById('pr-editing-id').value;
+  const images=[0,1,2,3].map(i=>document.getElementById('pr-img-'+i).value.trim()).filter(Boolean);
+  const productRow={user_id:currentUser.id,name,tagline:document.getElementById('pr-tagline').value||'',cat:document.getElementById('pr-cat').value,icon:document.getElementById('pr-icon').value||'🍫',price:parseFloat(document.getElementById('pr-price').value)||null,images:JSON.stringify(images),recipe:JSON.stringify(document.getElementById('pr-recipe').value.split('\n').filter(Boolean)),notes:document.getElementById('pr-notes').value||''};
+  let productId=editingId;
+  if (editingId) {
+    const {error}=await sb.from('products').update(productRow).eq('id',editingId);
+    if (error){btn.disabled=false;btn.textContent='Update Product';showToast('Error — '+error.message);return;}
+    await sb.from('ingredients').delete().eq('product_id',editingId);
+  } else {
+    const {data,error}=await sb.from('products').insert(productRow).select().single();
+    if (error){btn.disabled=false;btn.textContent='Save Product';showToast('Error — '+error.message);return;}
+    productId=data.id;
+  }
+  const ingredients=getIngredients();
+  if (ingredients.length) await sb.from('ingredients').insert(ingredients.map(i=>({product_id:productId,...i,cost:parseFloat(i.cost)||null})));
+  btn.disabled=false; btn.textContent=editingId?'Update Product':'Save Product';
+  showToast(editingId?'Product updated ✦':'Product saved ✦');
+  closeProductModal(); await loadAllData();
+}
+
+/* ══════════════════════════════════════════════════════════
+   BRAND IDENTITY
+══════════════════════════════════════════════════════════ */
+function scheduleBrandSave() {
+  clearTimeout(brandSaveTimer);
+  brandSaveTimer = setTimeout(saveBrandIdentity, 1200);
+}
+async function saveBrandIdentity() {
+  const row={user_id:currentUser.id,origin_story:document.getElementById('bf-origin-story').value,mission:document.getElementById('bf-mission').value,tone_of_voice:document.getElementById('bf-tone').value,target_customer:document.getElementById('bf-target').value,price_positioning:document.getElementById('bf-price').value,design_direction_notes:document.getElementById('bf-design-notes').value,updated_at:new Date().toISOString()};
+  if (brandIdentityId) {
+    await sb.from('brand_identity').update(row).eq('id',brandIdentityId);
+  } else {
+    const {data}=await sb.from('brand_identity').insert(row).select().single();
+    if (data) brandIdentityId=data.id;
+  }
+  const ind=document.getElementById('brand-save-indicator');
+  ind.style.opacity='1';
+  setTimeout(()=>{ind.style.opacity='0';},2000);
+}
+
+/* ══════════════════════════════════════════════════════════
+   NAV / FILTERS / MODALS
+══════════════════════════════════════════════════════════ */
+function showPage(name,btn) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  if (btn) btn.classList.add('active');
+}
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function setPackFilter(btn,f) {
+  document.querySelectorAll('#page-packaging .filter-chip').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active'); packFilter=f; applyPackFilters();
+}
+function setProdFilter(btn,f) {
+  document.querySelectorAll('#page-products .filter-chip').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active'); prodFilter=f; applyProdFilters();
+}
+function applyPackFilters() {
+  const q=document.getElementById('pack-search').value.toLowerCase();
+  renderPackaging(packagingData.filter(p=>(packFilter==='all'||p.art===packFilter)&&(!q||[p.brand,p.desc,p.art,p.enclosure,p.inner,p.whatToBorrow].join(' ').toLowerCase().includes(q))));
+}
+function applyProdFilters() {
+  const q=document.getElementById('prod-search').value.toLowerCase();
+  renderProducts(productData.filter(p=>(prodFilter==='all'||p.cat===prodFilter)&&(!q||[p.name,p.tagline].join(' ').toLowerCase().includes(q))));
+}
+
+/* Init */
+renderTagUI();
+</script>
+</body>
+</html>
