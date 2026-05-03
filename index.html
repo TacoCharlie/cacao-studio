@@ -554,6 +554,9 @@ input[type="file"] { display: none; }
           <button class="img-slot-remove" onclick="removeImage(event,3)">×</button>
         </div>
       </div>
+      <div style="margin-top:8px">
+        <button class="add-color-btn" id="add-photo-btn" onclick="addPhotoSlot()" style="font-size:11px;padding:6px 12px">+ Add photo</button>
+      </div>
       <div class="img-hint">Click a slot to upload. Photos are stored securely in the cloud.</div>
       <div style="margin-top:10px">
         <label class="fl">Colour scheme <span style="font-weight:300;text-transform:none;letter-spacing:0">(extracted from photos or add manually)</span></label>
@@ -959,9 +962,10 @@ let selectedGraphicEls = new Set();
 let currentFormat = '';
 let currentProfile = '';
 let currentClosure = '';
-let pendingImages = [null, null, null, null];
-let pendingImagePreviews = [null, null, null, null];
-let existingImageUrls = [null, null, null, null];
+let pendingImages = [null, null, null, null, null, null];
+let pendingImagePreviews = [null, null, null, null, null, null];
+let existingImageUrls = [null, null, null, null, null, null];
+let activeSlots = 4; // starts with 4, expandable to 6
 let pendingColors = [];
 let tagRatings = {}; // { attr: 1|2|3 }
 let brandIdentityId = null;
@@ -1110,7 +1114,8 @@ function openDetail(id) {
 
   // Images
   const imgs = (p.images||[]).filter(Boolean);
-  document.getElementById('detail-images').innerHTML = [0,1,2,3].map(i =>
+  const slotCount = Math.max(4, imgs.length);
+  document.getElementById('detail-images').innerHTML = Array.from({length: slotCount}, (_,i) =>
     imgs[i]
       ? `<div class="detail-img-wrap" onclick="openLightbox('${imgs[i]}')"><img src="${imgs[i]}" alt="" onerror="this.parentElement.innerHTML='<div class=detail-img-ph><span>⚠</span><span style=font-size:9px>Not found</span></div>'"></div>`
       : `<div class="detail-img-ph"><span style="font-size:18px;color:var(--border-md)">+</span><span>Photo ${i+1}</span></div>`
@@ -1200,7 +1205,9 @@ async function editPackagingConcept() {
     existingImageUrls = [...(p.images || [])];
     existingImageUrls.forEach((url, i) => {
       if (!url) return;
+      if (i >= activeSlots) addPhotoSlot();
       const slot = document.getElementById('img-slot-'+i);
+      if (!slot) return;
       let img = slot.querySelector('img');
       if (!img) { img = document.createElement('img'); slot.prepend(img); }
       img.src = url; slot.classList.add('has-image');
@@ -1314,9 +1321,14 @@ function updatePackStats() {
 ══════════════════════════════════════════════════════════ */
 function openPackModal() {
   // Reset all state
-  pendingImages = [null,null,null,null];
-  pendingImagePreviews = [null,null,null,null];
-  existingImageUrls = [null,null,null,null];
+  pendingImages = [null,null,null,null,null,null];
+  pendingImagePreviews = [null,null,null,null,null,null];
+  existingImageUrls = [null,null,null,null,null,null];
+  // Remove any extra slots beyond 4
+  [4,5].forEach(i => { const s = document.getElementById('img-slot-'+i); if(s) s.remove(); });
+  activeSlots = 4;
+  const addBtn = document.getElementById('add-photo-btn');
+  if (addBtn) addBtn.style.display = '';
   pendingColors = [];
   tagRatings = {};
   currentArtStyle = '';
@@ -1329,18 +1341,30 @@ function openPackModal() {
   ['p-format','p-profile','p-closure'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
   document.querySelectorAll('.attr-visual-opt').forEach(el => el.classList.remove('selected'));
   document.querySelectorAll('.graphic-el-btn').forEach(el => el.classList.remove('selected'));
-  [0,1,2,3].forEach(i => {
+  [0,1,2,3,4,5].forEach(i => {
     const slot = document.getElementById('img-slot-'+i);
+    if (!slot) return;
     slot.classList.remove('has-image');
     const img = slot.querySelector('img'); if (img) img.remove();
-    document.getElementById('img-file-'+i).value = '';
+    const fileInput = document.getElementById('img-file-'+i);
+    if (fileInput) fileInput.value = '';
   });
   renderColorStrip();
   renderTagUI();
   document.getElementById('modal-pack').classList.add('open');
 }
 
-function triggerUpload(i) {
+function addPhotoSlot() {
+  if (activeSlots >= 6) { document.getElementById('add-photo-btn').style.display = 'none'; return; }
+  const i = activeSlots++;
+  const grid = document.getElementById('img-upload-grid');
+  const slot = document.createElement('div');
+  slot.className = 'img-slot'; slot.id = 'img-slot-'+i;
+  slot.setAttribute('onclick', `triggerUpload(${i})`);
+  slot.innerHTML = `<input type="file" id="img-file-${i}" accept="image/*" onchange="handleImageFile(${i},this)"><div class="img-slot-icon">+</div><div class="img-slot-label">Photo ${i+1}</div><button class="img-slot-remove" onclick="removeImage(event,${i})">×</button>`;
+  grid.appendChild(slot);
+  if (activeSlots >= 6) document.getElementById('add-photo-btn').style.display = 'none';
+}
   if (!document.getElementById('img-slot-'+i).classList.contains('has-image')) {
     document.getElementById('img-file-'+i).click();
   }
@@ -1596,7 +1620,7 @@ async function savePackagingConcept() {
 
   // Build final image URL array — start with existing, replace slots that have new uploads
   const imageUrls = [...existingImageUrls];
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < activeSlots; i++) {
     if (pendingImages[i]) {
       const file = pendingImages[i];
       const path = `${currentUser.id}/${Date.now()}-${i}-${file.name.replace(/\s+/g,'_')}`;
