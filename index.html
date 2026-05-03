@@ -959,9 +959,9 @@ let customAttrOptions = {}; // { attribute: [values] }
 let packFilter = 'all', prodFilter = 'all';
 let currentArtStyle = '';
 let selectedGraphicEls = new Set();
-let currentFormat = '';
-let currentProfile = '';
-let currentClosure = '';
+let currentFormats = [];
+let currentProfiles = [];
+let currentClosures = [];
 let pendingImages = [null, null, null, null, null, null];
 let pendingImagePreviews = [null, null, null, null, null, null];
 let existingImageUrls = [null, null, null, null, null, null];
@@ -971,6 +971,15 @@ let tagRatings = {}; // { attr: 1|2|3 }
 let brandIdentityId = null;
 let brandSaveTimer = null;
 let ingRowCount = 0;
+
+/* ══════════════════════════════════════════════════════════
+   HELPERS
+══════════════════════════════════════════════════════════ */
+function tryParseArray(val) {
+  if (!val) return [];
+  try { const parsed = JSON.parse(val); return Array.isArray(parsed) ? parsed : [parsed]; }
+  catch(e) { return [val]; } // handle old string values
+}
 
 /* ══════════════════════════════════════════════════════════
    LOAD DATA
@@ -990,10 +999,10 @@ async function loadAllData() {
       id: row.id, name: row.brand, desc: row.product_description,
       brand: row.brand, colors: row.colors ? JSON.parse(row.colors) : [],
       // New fields with fallback to old field names for backwards compat
-      format: row.packaging_format || row.shape || null,
+      format: row.packaging_format ? tryParseArray(row.packaging_format) : (row.shape ? [row.shape] : []),
       size: row.size, orient: row.orient,
-      profile: row.profile || null,
-      closure: row.closure_mechanism || row.enclosure || null,
+      profile: row.profile ? tryParseArray(row.profile) : [],
+      closure: row.closure_mechanism ? tryParseArray(row.closure_mechanism) : (row.enclosure ? [row.enclosure] : []),
       inner: row.inner_wrap,
       graphicElements: row.graphic_elements ? JSON.parse(row.graphic_elements) : [],
       whatWorks: row.what_works, whatToBorrow: row.what_to_borrow,
@@ -1105,9 +1114,9 @@ function openDetail(id) {
   // Attributes table
   const attrs = [
     ['Colour scheme', `<div class="color-swatches-row">${(p.colors||[]).map(c=>`<div class="swatch" style="background:${c};width:18px;height:18px" title="${c}"></div>`).join('')}</div>`],
-    ['Format', p.format||'—'], ['Size', p.size||'—'],
-    ['Orientation', p.orient||'—'], ['Profile', p.profile||'—'],
-    ['Closure', p.closure||'—'], ['Inner wrap', p.inner||'—'],
+    ['Format', (p.format||[]).join(', ')||'—'], ['Size', p.size||'—'],
+    ['Orientation', p.orient||'—'], ['Profile', (p.profile||[]).join(', ')||'—'],
+    ['Closure', (p.closure||[]).join(', ')||'—'], ['Inner wrap', p.inner||'—'],
   ];
   document.getElementById('detail-attrs').innerHTML = attrs.map(([label, val]) =>
     `<tr class="attr-row"><td class="attr-label">${label}</td><td class="attr-val">${val}</td></tr>`).join('');
@@ -1168,28 +1177,28 @@ async function editPackagingConcept() {
       }
     });
 
-    // Restore format visual selector
-    if (p.format) {
-      currentFormat = p.format;
-      const fBtn = document.querySelector(`#format-grid .attr-visual-opt[data-val="${p.format}"]`);
-      if (fBtn) fBtn.classList.add('selected');
-    }
+    // Restore format visual selectors (multi-select)
+    currentFormats = [...(p.format || [])];
+    currentFormats.forEach(val => {
+      const btn = document.querySelector(`#format-grid .attr-visual-opt[data-val="${val}"]`);
+      if (btn) btn.classList.add('selected');
+    });
 
-    // Restore profile visual selector
-    if (p.profile) {
-      currentProfile = p.profile;
+    // Restore profile visual selectors
+    currentProfiles = [...(p.profile || [])];
+    currentProfiles.forEach(val => {
       document.querySelectorAll('.attr-visual-opt').forEach(el => {
-        if (el.dataset.val === p.profile) el.classList.add('selected');
+        if (el.dataset.val === val && el.closest('.fg') && el.closest('.fg').querySelector('#p-profile')) el.classList.add('selected');
       });
-    }
+    });
 
-    // Restore closure visual selector
-    if (p.closure) {
-      currentClosure = p.closure;
+    // Restore closure visual selectors
+    currentClosures = [...(p.closure || [])];
+    currentClosures.forEach(val => {
       document.querySelectorAll('.attr-visual-opt').forEach(el => {
-        if (el.dataset.val === p.closure) el.classList.add('selected');
+        if (el.dataset.val === val && el.closest('.fg') && el.closest('.fg').querySelector('#p-closure')) el.classList.add('selected');
       });
-    }
+    });
 
     // Restore graphic elements
     selectedGraphicEls = new Set(p.graphicElements || []);
@@ -1334,7 +1343,7 @@ function openPackModal() {
   currentArtStyle = '';
   editingPackId = null;
   selectedGraphicEls = new Set();
-  currentFormat = ''; currentProfile = ''; currentClosure = '';
+  currentFormats = []; currentProfiles = []; currentClosures = [];
   ['p-brand','p-desc','p-what-works','p-what-to-borrow','p-what-doesnt-work',
    'p-format-custom-val','p-profile-custom-val','p-closure-custom-val'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
   ['p-size','p-orient','p-inner'].forEach(id => document.getElementById(id).selectedIndex = 0);
@@ -1502,14 +1511,21 @@ function addManualColor() {
    ART STYLE SELECTOR
 ══════════════════════════════════════════════════════════ */
 function selectAttr(el, hiddenId, val) {
-  const grid = el.closest('.attr-visual-grid') || el.parentElement;
-  grid.querySelectorAll('.attr-visual-opt').forEach(o => o.classList.remove('selected'));
-  el.classList.add('selected');
-  const hidden = document.getElementById(hiddenId);
-  if (hidden) hidden.value = val;
-  if (hiddenId === 'p-format') currentFormat = val;
-  if (hiddenId === 'p-profile') currentProfile = val;
-  if (hiddenId === 'p-closure') currentClosure = val;
+  // Toggle — multiple selections allowed
+  el.classList.toggle('selected');
+  const isSelected = el.classList.contains('selected');
+  if (hiddenId === 'p-format') {
+    if (isSelected) { if (!currentFormats.includes(val)) currentFormats.push(val); }
+    else currentFormats = currentFormats.filter(v => v !== val);
+  }
+  if (hiddenId === 'p-profile') {
+    if (isSelected) { if (!currentProfiles.includes(val)) currentProfiles.push(val); }
+    else currentProfiles = currentProfiles.filter(v => v !== val);
+  }
+  if (hiddenId === 'p-closure') {
+    if (isSelected) { if (!currentClosures.includes(val)) currentClosures.push(val); }
+    else currentClosures = currentClosures.filter(v => v !== val);
+  }
 }
 
 function selectAttrCustom(hiddenId, inputId) {
@@ -1520,10 +1536,9 @@ function selectAttrCustom(hiddenId, inputId) {
   const section = inputEl.closest('.modal-section') || inputEl.closest('.fg');
   if (section) section.querySelectorAll('.attr-visual-opt').forEach(o => o.classList.remove('selected'));
   const hidden = document.getElementById(hiddenId);
-  if (hidden) hidden.value = val;
-  if (hiddenId === 'p-format') currentFormat = val;
-  if (hiddenId === 'p-profile') currentProfile = val;
-  if (hiddenId === 'p-closure') currentClosure = val;
+  if (hiddenId === 'p-format') { if (!currentFormats.includes(val)) currentFormats.push(val); }
+  if (hiddenId === 'p-profile') { if (!currentProfiles.includes(val)) currentProfiles.push(val); }
+  if (hiddenId === 'p-closure') { if (!currentClosures.includes(val)) currentClosures.push(val); }
   // Clear the input after use
   inputEl.value = '';
   inputEl.style.borderColor = 'var(--sage)';
@@ -1639,11 +1654,11 @@ async function savePackagingConcept() {
     brand,
     product_description: document.getElementById('p-desc').value,
     colors: JSON.stringify(pendingColors),
-    packaging_format: currentFormat,
+    packaging_format: JSON.stringify(currentFormats),
     size: document.getElementById('p-size').value,
     orient: document.getElementById('p-orient').value,
-    profile: currentProfile,
-    closure_mechanism: currentClosure,
+    profile: JSON.stringify(currentProfiles),
+    closure_mechanism: JSON.stringify(currentClosures),
     inner_wrap: document.getElementById('p-inner').value,
     graphic_elements: JSON.stringify([...selectedGraphicEls]),
     what_works: document.getElementById('p-what-works').value,
