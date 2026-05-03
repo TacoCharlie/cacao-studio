@@ -379,20 +379,11 @@ input[type="file"] { display: none; }
       <div><div class="page-head-title">Packaging Catalogue</div><div class="page-head-sub">Click any card to expand · rate what you'd borrow for Evoke</div></div>
       <button class="btn-primary" onclick="openPackModal()">+ Add Concept</button>
     </div>
-    <div class="stats-row">
+    <div class="stats-row" style="grid-template-columns:1fr">
       <div class="stat-card"><div class="stat-label">Concepts</div><div class="stat-value" id="pack-count">0</div></div>
-      <div class="stat-card"><div class="stat-label">Most loved attribute</div><div class="stat-value" id="top-attr" style="font-size:16px;margin-top:6px">—</div></div>
-      <div class="stat-card"><div class="stat-label">Art styles</div><div class="stat-value" id="art-count">0</div></div>
     </div>
     <div class="filter-row">
-      <input class="search-input" id="pack-search" placeholder="Search by brand, style, notes…" oninput="applyPackFilters()">
-      <button class="filter-chip active" onclick="setPackFilter(this,'all')">All</button>
-      <button class="filter-chip" onclick="setPackFilter(this,'Minimal')">Minimal</button>
-      <button class="filter-chip" onclick="setPackFilter(this,'Luxury')">Luxury</button>
-      <button class="filter-chip" onclick="setPackFilter(this,'Artisan')">Artisan</button>
-      <button class="filter-chip" onclick="setPackFilter(this,'Geometric')">Geometric</button>
-      <button class="filter-chip" onclick="setPackFilter(this,'Illustrative')">Illustrative</button>
-      <button class="filter-chip" onclick="setPackFilter(this,'Bold')">Bold</button>
+      <input class="search-input" id="pack-search" placeholder="Search by brand, notes, graphic elements…" oninput="applyPackFilters()">
     </div>
     <div class="pack-grid" id="pack-grid"></div>
   </div>
@@ -1232,7 +1223,6 @@ async function editPackagingConcept() {
 ══════════════════════════════════════════════════════════ */
 function updatePackStats() {
   document.getElementById('pack-count').textContent = packagingData.length;
-  document.getElementById('art-count').textContent = new Set(packagingData.map(p=>p.art).filter(Boolean)).size;
 
   // Weighted attribute scores (Love=3pts, Like=2pts, Interesting=1pt)
   const scores = {};
@@ -1245,9 +1235,6 @@ function updatePackStats() {
       }
     });
   });
-
-  const top = Object.entries(scores).sort((a,b) => b[1]-a[1])[0];
-  document.getElementById('top-attr').textContent = top ? `${ATTR_LABELS[top[0]]||top[0]}` : '—';
 
   // Attribute ratings panel
   const likedEl = document.getElementById('liked-summary');
@@ -1864,17 +1851,15 @@ function showPage(name,btn) {
 }
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-function setPackFilter(btn,f) {
-  document.querySelectorAll('#page-packaging .filter-chip').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active'); packFilter=f; applyPackFilters();
+function applyPackFilters() {
+  const q = document.getElementById('pack-search').value.toLowerCase();
+  renderPackaging(packagingData.filter(p =>
+    !q || [p.brand, p.desc, p.inner, p.whatToBorrow, p.whatWorks, (p.graphicElements||[]).join(' ')].join(' ').toLowerCase().includes(q)
+  ));
 }
 function setProdFilter(btn,f) {
   document.querySelectorAll('#page-products .filter-chip').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active'); prodFilter=f; applyProdFilters();
-}
-function applyPackFilters() {
-  const q=document.getElementById('pack-search').value.toLowerCase();
-  renderPackaging(packagingData.filter(p=>(packFilter==='all'||p.art===packFilter)&&(!q||[p.brand,p.desc,p.art,p.enclosure,p.inner,p.whatToBorrow].join(' ').toLowerCase().includes(q))));
 }
 function applyProdFilters() {
   const q=document.getElementById('prod-search').value.toLowerCase();
