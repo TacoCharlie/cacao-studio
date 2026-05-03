@@ -1365,6 +1365,8 @@ function addPhotoSlot() {
   grid.appendChild(slot);
   if (activeSlots >= 6) document.getElementById('add-photo-btn').style.display = 'none';
 }
+
+function triggerUpload(i) {
   if (!document.getElementById('img-slot-'+i).classList.contains('has-image')) {
     document.getElementById('img-file-'+i).click();
   }
