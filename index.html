@@ -2093,15 +2093,37 @@ function renderBriefs() {
     list.innerHTML = `<div class="empty-state" style="grid-column:unset"><div class="empty-state-title">No briefs yet</div><div class="empty-state-sub">Create a brief to generate a packaging direction for a specific product.</div></div>`;
     return;
   }
+  // Group by name to assign version numbers
+  const versionMap = {};
+  [...briefsData].reverse().forEach(b => {
+    if (!versionMap[b.name]) versionMap[b.name] = 0;
+    versionMap[b.name]++;
+    b._version = versionMap[b.name];
+  });
+
   list.innerHTML = briefsData.map(b => {
     const refs = b.reference_ids ? JSON.parse(b.reference_ids) : [];
-    const date = new Date(b.created_at).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+    const date = new Date(b.created_at);
+    const dateStr = date.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+    const timeStr = date.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
+    // Get first meaningful line as excerpt
+    const excerpt = (b.brief_content || '').split('\n').find(l => l.trim() && !l.startsWith('#') && !l.startsWith('---') && l.length > 20) || '';
+    const cleanExcerpt = excerpt.replace(/\*\*/g,'').replace(/#[0-9a-fA-F]{6}/g,'').trim().slice(0,120);
+    const totalVersions = versionMap[b.name] || 1;
     return `<div class="brief-card" onclick="openBriefDetail('${b.id}')">
-      <div class="brief-card-name">${b.name}</div>
-      <div class="brief-card-meta">
-        <span>${date}</span>
-        <span>${refs.length} reference${refs.length !== 1 ? 's' : ''}</span>
-        <span class="chip ${b.status === 'Draft' ? 'chip-status-hold' : 'chip-status-ready'}" style="padding:2px 8px">${b.status}</span>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <div class="brief-card-name">${b.name}</div>
+            ${totalVersions > 1 ? `<span style="font-size:10px;padding:2px 7px;background:var(--parchment);border-radius:4px;color:var(--muted);flex-shrink:0">v${b._version} of ${totalVersions}</span>` : ''}
+          </div>
+          ${cleanExcerpt ? `<div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:8px">${cleanExcerpt}…</div>` : ''}
+          <div class="brief-card-meta">
+            <span>${dateStr} at ${timeStr}</span>
+            <span>${refs.length} reference${refs.length !== 1 ? 's' : ''}</span>
+            <span class="chip ${b.status === 'Draft' ? 'chip-status-hold' : 'chip-status-ready'}" style="padding:2px 8px">${b.status}</span>
+          </div>
+        </div>
       </div>
     </div>`;
   }).join('');
