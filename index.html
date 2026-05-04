@@ -2343,16 +2343,35 @@ function openCompareModal(experimentId) {
   document.getElementById('compare-title').textContent = 'Version Comparison';
   document.getElementById('compare-subtitle').textContent = exp.name;
 
-  const versions = exp.versions;
-  if (versions.length < 2) { showToast('Need at least 2 versions to compare'); return; }
+  document.getElementById('compare-body').innerHTML = `
+    <div style="margin-bottom:16px">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:12px;letter-spacing:0.04em">Select versions to compare:</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+        ${exp.versions.map(v => `
+          <label style="display:flex;align-items:center;gap:7px;padding:7px 14px;border:1.5px solid var(--border-md);border-radius:var(--radius);cursor:pointer;font-size:12px;background:var(--cream)" id="ver-sel-label-${v.id}">
+            <input type="checkbox" id="ver-sel-${v.id}" value="${v.id}" checked style="accent-color:var(--ink)">
+            v${v.versionNumber}${v.label ? ' — '+v.label : ''}
+          </label>`).join('')}
+      </div>
+      <button class="btn-primary" onclick="renderCompareTable('${experimentId}')" style="font-size:12px;padding:8px 20px">Compare selected</button>
+    </div>
+    <div id="compare-table-wrap"></div>`;
 
-  // Gather all unique ingredient names across all versions
+  document.getElementById('modal-compare').classList.add('open');
+}
+
+function renderCompareTable(experimentId) {
+  const exp = labData.find(e => e.id === experimentId); if (!exp) return;
+  const selectedIds = exp.versions.map(v => v.id).filter(id => {
+    const cb = document.getElementById('ver-sel-'+id);
+    return cb && cb.checked;
+  });
+  if (selectedIds.length < 2) { showToast('Select at least 2 versions to compare'); return; }
+  const versions = exp.versions.filter(v => selectedIds.includes(v.id));
+
   const allIngNames = [...new Set(versions.flatMap(v => (v.ingredients||[]).map(i => i.name)).filter(Boolean))];
-
-  // Build header row
   const headerCols = versions.map(v => `<th class="ver-col">v${v.versionNumber}<br><span style="font-size:9px;font-weight:300;opacity:0.7">${v.label||''}</span></th>`).join('');
 
-  // Build ingredient rows
   const ingRows = allIngNames.map(name => {
     const cols = versions.map(v => {
       const ing = (v.ingredients||[]).find(i => i.name === name);
@@ -2366,37 +2385,15 @@ function openCompareModal(experimentId) {
     return `<tr><td style="font-weight:500">${name}</td>${cols}</tr>`;
   }).join('');
 
-  // COGS row
-  const cogsRow = `<tr class="compare-cogs-row">
-    <td>Total COGS</td>
-    ${versions.map(v => `<td class="ver-val">$${calcCogs(v.ingredients).toFixed(2)}</td>`).join('')}
-  </tr>`;
+  const cogsRow = `<tr class="compare-cogs-row"><td>Total COGS</td>${versions.map(v=>`<td class="ver-val">$${calcCogs(v.ingredients).toFixed(2)}</td>`).join('')}</tr>`;
+  const notesRow = `<tr><td class="row-label">Notes</td>${versions.map(v=>`<td class="compare-outcome">${v.notes||'—'}</td>`).join('')}</tr>`;
+  const outcomeRow = `<tr><td class="row-label">Outcome</td>${versions.map(v=>`<td class="compare-outcome">${v.outcome||'<span style="color:var(--border-md)">Not yet evaluated</span>'}</td>`).join('')}</tr>`;
 
-  // Notes row
-  const notesRow = `<tr>
-    <td class="row-label">Notes</td>
-    ${versions.map(v => `<td class="compare-outcome">${v.notes||'—'}</td>`).join('')}
-  </tr>`;
-
-  // Outcome row
-  const outcomeRow = `<tr>
-    <td class="row-label">Outcome</td>
-    ${versions.map(v => `<td class="compare-outcome">${v.outcome || '<span style="color:var(--border-md)">Not yet evaluated</span>'}</td>`).join('')}
-  </tr>`;
-
-  document.getElementById('compare-body').innerHTML = `
+  document.getElementById('compare-table-wrap').innerHTML = `
     <table class="compare-table">
       <thead><tr><th style="min-width:140px">Ingredient</th>${headerCols}</tr></thead>
-      <tbody>
-        ${ingRows}
-        ${cogsRow}
-        <tr><td class="row-label" colspan="${versions.length+1}" style="padding-top:12px">Evaluation</td></tr>
-        ${notesRow}
-        ${outcomeRow}
-      </tbody>
+      <tbody>${ingRows}${cogsRow}<tr><td class="row-label" colspan="${versions.length+1}" style="padding-top:12px">Evaluation</td></tr>${notesRow}${outcomeRow}</tbody>
     </table>`;
-
-  document.getElementById('modal-compare').classList.add('open');
 }
 
 function closeCompareModal() { document.getElementById('modal-compare').classList.remove('open'); }
