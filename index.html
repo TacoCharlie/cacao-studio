@@ -311,6 +311,44 @@ input[type="file"] { display: none; }
 .add-ing-btn { width: 100%; padding: 8px; font-size: 12px; color: var(--copper); border-top: 1px solid var(--border-md); background: var(--parchment); text-align: center; transition: background var(--t); }
 .add-ing-btn:hover { background: var(--cream); }
 
+/* ── LAB ────────────────────────────────────────────────── */
+.lab-list { display: flex; flex-direction: column; gap: 12px; }
+.lab-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+.lab-card-head { display: flex; align-items: center; gap: 14px; padding: 14px 18px; cursor: pointer; transition: background var(--t); }
+.lab-card-head:hover { background: var(--parchment); }
+.lab-card-name { font-family: var(--serif); font-size: 16px; font-weight: 400; }
+.lab-card-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.lab-card-chips { display: flex; gap: 6px; align-items: center; }
+.chip-status-active { background: #EAF3DE; color: #27500A; }
+.chip-status-hold { background: #FDF3E0; color: #7A4E0A; }
+.chip-status-ready { background: #E8F0FE; color: #1A56DB; }
+.chip-status-abandoned { background: #F3F3F3; color: #666; }
+.lab-card-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.lab-action-btn { padding: 5px 12px; border: 1px solid var(--border-md); border-radius: 6px; font-size: 11px; color: var(--muted); transition: all var(--t); }
+.lab-action-btn:hover { background: var(--parchment); color: var(--cocoa); border-color: var(--cocoa); }
+.lab-action-btn.promote { color: #1A56DB; border-color: #1A56DB; }
+.lab-action-btn.promote:hover { background: #E8F0FE; }
+.lab-expand { border-top: 1px solid var(--border); display: none; }
+.lab-expand.open { display: block; }
+.lab-versions { padding: 16px 18px; }
+.lab-versions-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.lab-versions-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); }
+.version-card { border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; overflow: hidden; }
+.version-head { display: flex; align-items: center; gap: 12px; padding: 10px 14px; cursor: pointer; background: var(--parchment); transition: background var(--t); }
+.version-head:hover { background: var(--cream); }
+.version-num { width: 24px; height: 24px; border-radius: 50%; background: var(--ink); color: var(--cream); font-size: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.version-label { font-size: 13px; font-family: var(--serif); flex: 1; }
+.version-date { font-size: 10px; color: var(--muted); }
+.version-cogs { font-size: 11px; font-weight: 500; color: var(--cocoa); }
+.version-edit-btn { font-size: 11px; color: var(--muted); padding: 3px 8px; border: 1px solid var(--border-md); border-radius: 4px; transition: all var(--t); }
+.version-edit-btn:hover { color: var(--cocoa); border-color: var(--cocoa); }
+.version-body { display: none; padding: 14px; background: #fff; border-top: 1px solid var(--border); }
+.version-body.open { display: block; }
+.version-grid { display: grid; grid-template-columns: 1.6fr 1fr 1fr; gap: 16px; }
+.version-section h5 { font-size: 9px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); margin-bottom: 8px; }
+.version-outcome { margin-top: 12px; padding: 10px 12px; background: var(--parchment); border-radius: var(--radius); border-left: 3px solid var(--gold); font-size: 12px; color: var(--ink); line-height: 1.6; }
+.version-outcome-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 4px; }
+
 /* ── DESIGN DIRECTION ───────────────────────────────────── */
 .dir-section-label { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
 .dir-section-title { font-family: var(--serif); font-size: 20px; font-weight: 300; font-style: italic; display: block; }
@@ -494,16 +532,90 @@ input[type="file"] { display: none; }
     </div>
   </div>
 
-  <!-- LAB PAGE (stub) -->
+  <!-- LAB PAGE -->
   <div class="page" id="page-lab">
     <div class="page-head">
-      <div><div class="page-head-title">Lab</div><div class="page-head-sub">Recipe experiments, iterations and development — with versioning and COGS analysis</div></div>
-      <button class="btn-primary" style="opacity:0.4;cursor:not-allowed">+ New Experiment</button>
+      <div><div class="page-head-title">Lab</div><div class="page-head-sub">Recipe experiments, iterations and COGS analysis</div></div>
+      <button class="btn-primary" onclick="openLabModal()">+ New Experiment</button>
     </div>
-    <div class="empty-state" style="grid-column:unset;padding:80px 20px">
-      <div class="empty-state-title">Coming soon</div>
-      <div class="empty-state-sub">Recipe experiments, ingredient sourcing comparisons, cost analysis, and versioned iterations will live here. Graduated experiments get promoted to Production Ready.</div>
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-label">Experiments</div><div class="stat-value" id="lab-count">0</div></div>
+      <div class="stat-card"><div class="stat-label">Active</div><div class="stat-value" id="lab-active">0</div></div>
+      <div class="stat-card"><div class="stat-label">Ready to promote</div><div class="stat-value" id="lab-ready">0</div></div>
     </div>
+    <div class="filter-row">
+      <input class="search-input" id="lab-search" placeholder="Search experiments…" oninput="applyLabFilters()">
+      <button class="filter-chip active" onclick="setLabFilter(this,'all')">All</button>
+      <button class="filter-chip" onclick="setLabFilter(this,'Active')">Active</button>
+      <button class="filter-chip" onclick="setLabFilter(this,'On hold')">On hold</button>
+      <button class="filter-chip" onclick="setLabFilter(this,'Ready to promote')">Ready to promote</button>
+      <button class="filter-chip" onclick="setLabFilter(this,'Abandoned')">Abandoned</button>
+    </div>
+    <div class="lab-list" id="lab-list"></div>
+  </div>
+</div>
+
+<!-- ADD/EDIT EXPERIMENT MODAL -->
+<div class="modal-overlay" id="modal-lab" onclick="if(event.target===this)closeLabModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title" id="lab-modal-title">New Experiment</div>
+      <button class="modal-x" onclick="closeLabModal()">✕</button>
+    </div>
+    <div class="modal-subtitle" id="lab-modal-subtitle">Define a new recipe experiment</div>
+    <div class="frow">
+      <div class="fg" style="flex:2"><label class="fl">Experiment name</label><input class="fi" id="lab-name" placeholder="e.g. Peru 72% Dark — Batch 1"></div>
+      <div class="fg"><label class="fl">Product type</label>
+        <select class="smart-select" id="lab-type" style="padding:8px 12px">
+          <option>Bar</option><option>Bonbon</option><option>Drinking chocolate</option><option>Spread</option><option>Confection</option><option>Other</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg"><label class="fl">Description / goal</label><textarea class="fta" id="lab-desc" placeholder="What are you trying to achieve with this experiment?"></textarea></div>
+    <div class="fg"><label class="fl">Status</label>
+      <select class="smart-select" id="lab-status" style="padding:8px 12px">
+        <option>Active</option><option>On hold</option><option>Ready to promote</option><option>Abandoned</option>
+      </select>
+    </div>
+    <input type="hidden" id="lab-editing-id" value="">
+    <button class="submit-btn" id="lab-submit-btn" onclick="saveExperiment()">Create Experiment</button>
+  </div>
+</div>
+
+<!-- ADD VERSION MODAL -->
+<div class="modal-overlay" id="modal-version" onclick="if(event.target===this)closeVersionModal()">
+  <div class="modal" style="width:min(720px,94vw)" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title" id="version-modal-title">New Version</div>
+      <button class="modal-x" onclick="closeVersionModal()">✕</button>
+    </div>
+    <div class="modal-subtitle" id="version-modal-subtitle"></div>
+
+    <div class="frow">
+      <div class="fg"><label class="fl">Version label</label><input class="fi" id="ver-label" placeholder="e.g. v2 — reduced sugar, longer conch"></div>
+      <div class="fg" style="flex:0.4"><label class="fl">Copy from</label>
+        <select class="smart-select" id="ver-copy-from" style="padding:8px 12px" onchange="copyVersionData()">
+          <option value="">— start fresh —</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="fg">
+      <label class="fl">Ingredients &amp; Sourcing</label>
+      <div class="ing-builder">
+        <div class="ing-header"><span>Ingredient</span><span>Amount</span><span>Cost / unit ($)</span><span>Supplier</span><span>MOQ</span><span>URL</span><span></span></div>
+        <div id="ver-ing-rows"></div>
+        <button class="add-ing-btn" onclick="addVerIngRow()">+ Add ingredient</button>
+      </div>
+    </div>
+
+    <div class="fg"><label class="fl">Recipe steps — one per line</label><textarea class="fta" id="ver-recipe" style="min-height:100px" placeholder="Melt cacao paste at 45°C&#10;Add sugar, mix 4h at 60RPM&#10;Conch 12h at 55°C"></textarea></div>
+    <div class="fg"><label class="fl">Notes — what you changed and why</label><textarea class="fta" id="ver-notes" placeholder="Reduced sugar from 28% to 24% to bring out more bitterness. Extended conch time to smooth texture."></textarea></div>
+    <div class="fg"><label class="fl">Outcome</label><textarea class="fta" id="ver-outcome" placeholder="Leave blank until you've tasted and evaluated this version."></textarea></div>
+
+    <input type="hidden" id="ver-experiment-id" value="">
+    <input type="hidden" id="ver-editing-id" value="">
+    <button class="submit-btn" id="ver-submit-btn" onclick="saveVersion()">Save Version</button>
   </div>
 </div>
 
@@ -926,7 +1038,7 @@ async function bootApp(user) {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   document.getElementById('nav-user-email').textContent = user.email;
-  await loadAllData();
+  await Promise.all([loadAllData(), loadLabData()]);
 }
 
 sb.auth.getSession().then(({ data }) => { if (data.session) bootApp(data.session.user); });
@@ -1920,6 +2032,316 @@ function setProdFilter(btn,f) {
 function applyProdFilters() {
   const q=document.getElementById('prod-search').value.toLowerCase();
   renderProducts(productData.filter(p=>(prodFilter==='all'||p.cat===prodFilter)&&(!q||[p.name,p.tagline].join(' ').toLowerCase().includes(q))));
+}
+
+/* ══════════════════════════════════════════════════════════
+   LAB DATA
+══════════════════════════════════════════════════════════ */
+let labData = []; // experiments with nested versions
+let labFilter = 'all';
+let verIngRowCount = 0;
+
+/* ══════════════════════════════════════════════════════════
+   LAB LOAD
+══════════════════════════════════════════════════════════ */
+async function loadLabData() {
+  const [expRes, verRes] = await Promise.all([
+    sb.from('lab_experiments').select('*').order('created_at', { ascending: false }),
+    sb.from('lab_versions').select('*').order('version_number', { ascending: true })
+  ]);
+  if (expRes.data) {
+    labData = expRes.data.map(exp => ({
+      id: exp.id, name: exp.name, description: exp.description,
+      productType: exp.product_type, status: exp.status,
+      createdAt: exp.created_at,
+      versions: (verRes.data || [])
+        .filter(v => v.experiment_id === exp.id)
+        .map(v => ({
+          id: v.id, experimentId: v.experiment_id,
+          versionNumber: v.version_number, label: v.label,
+          notes: v.notes, outcome: v.outcome,
+          recipeSteps: v.recipe_steps ? JSON.parse(v.recipe_steps) : [],
+          ingredients: v.ingredients ? JSON.parse(v.ingredients) : [],
+          createdAt: v.created_at
+        }))
+    }));
+  }
+  renderLab(labData);
+}
+
+/* ══════════════════════════════════════════════════════════
+   LAB RENDER
+══════════════════════════════════════════════════════════ */
+function statusChipClass(status) {
+  if (status === 'Active') return 'chip-status-active';
+  if (status === 'On hold') return 'chip-status-hold';
+  if (status === 'Ready to promote') return 'chip-status-ready';
+  return 'chip-status-abandoned';
+}
+
+function renderLab(data) {
+  const list = document.getElementById('lab-list');
+  document.getElementById('lab-count').textContent = labData.length;
+  document.getElementById('lab-active').textContent = labData.filter(e => e.status === 'Active').length;
+  document.getElementById('lab-ready').textContent = labData.filter(e => e.status === 'Ready to promote').length;
+
+  if (!data.length) {
+    list.innerHTML = `<div class="empty-state" style="grid-column:unset"><div class="empty-state-title">No experiments yet</div><div class="empty-state-sub">Hit "+ New Experiment" to start tracking a recipe in development.</div></div>`;
+    return;
+  }
+
+  list.innerHTML = data.map(exp => {
+    const latestVer = exp.versions[exp.versions.length - 1];
+    const totalCogs = latestVer ? calcCogs(latestVer.ingredients) : 0;
+    return `<div class="lab-card">
+      <div class="lab-card-head" onclick="toggleLab('${exp.id}')">
+        <div style="flex:1">
+          <div class="lab-card-name">${exp.name}</div>
+          <div class="lab-card-meta">${exp.productType}${exp.versions.length ? ` · ${exp.versions.length} version${exp.versions.length>1?'s':''}` : ' · no versions yet'}</div>
+        </div>
+        <div class="lab-card-chips">
+          <span class="chip ${statusChipClass(exp.status)}">${exp.status}</span>
+          ${totalCogs > 0 ? `<span class="chip chip-cogs">$${totalCogs.toFixed(2)} COGS</span>` : ''}
+        </div>
+        <div class="lab-card-actions" onclick="event.stopPropagation()">
+          <button class="lab-action-btn" onclick="openLabModal('${exp.id}')">Edit</button>
+          ${exp.status === 'Ready to promote' ? `<button class="lab-action-btn promote" onclick="promoteToProduction('${exp.id}')">Promote →</button>` : ''}
+          <button class="lab-action-btn" onclick="openVersionModal('${exp.id}')">+ Version</button>
+        </div>
+      </div>
+      <div class="lab-expand" id="lab-expand-${exp.id}">
+        <div class="lab-versions">
+          ${exp.description ? `<div style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.6;padding:10px 12px;background:var(--parchment);border-radius:var(--radius)">${exp.description}</div>` : ''}
+          <div class="lab-versions-header">
+            <span class="lab-versions-title">Version history</span>
+          </div>
+          ${exp.versions.length ? [...exp.versions].reverse().map(ver => {
+            const cogs = calcCogs(ver.ingredients);
+            const dateStr = new Date(ver.createdAt).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+            return `<div class="version-card">
+              <div class="version-head" onclick="toggleVersion('${ver.id}')">
+                <div class="version-num">v${ver.versionNumber}</div>
+                <div class="version-label">${ver.label || `Version ${ver.versionNumber}`}</div>
+                <div class="version-date">${dateStr}</div>
+                ${cogs > 0 ? `<div class="version-cogs">$${cogs.toFixed(2)} COGS</div>` : ''}
+                <button class="version-edit-btn" onclick="event.stopPropagation();openVersionModal('${exp.id}','${ver.id}')">Edit</button>
+              </div>
+              <div class="version-body" id="vbody-${ver.id}">
+                <div class="version-grid">
+                  <div class="version-section">
+                    <h5>Ingredients</h5>
+                    ${ver.ingredients.length ? `
+                      <table class="ing-display">
+                        <thead><tr><th>Ingredient</th><th>Amount</th><th>Cost</th><th>Supplier</th></tr></thead>
+                        <tbody>${ver.ingredients.map(i => {
+                          let src = i.supplier || '';
+                          if (i.moq) src += src ? ` · MOQ ${i.moq}` : `MOQ ${i.moq}`;
+                          if (i.url) { try { src += ` <a class="ing-source-link" href="${i.url}" target="_blank">${new URL(i.url).hostname}</a>`; } catch(e){} }
+                          return `<tr><td><strong>${i.name||'—'}</strong></td><td>${i.amount||'—'}</td><td>${i.cost?'$'+parseFloat(i.cost).toFixed(2):'—'}</td><td style="font-size:11px">${src||'—'}</td></tr>`;
+                        }).join('')}</tbody>
+                      </table>
+                      ${cogs > 0 ? `<div class="cogs-total"><span>Total COGS</span><span>$${cogs.toFixed(2)}</span></div>` : ''}` :
+                      '<div style="font-size:12px;color:var(--muted)">No ingredients yet.</div>'}
+                  </div>
+                  <div class="version-section">
+                    <h5>Recipe steps</h5>
+                    ${ver.recipeSteps.length ? ver.recipeSteps.map((s,i) => `<div class="recipe-step"><div class="step-num">${i+1}</div><span>${s}</span></div>`).join('') : '<div style="font-size:12px;color:var(--muted)">No steps yet.</div>'}
+                  </div>
+                  <div class="version-section">
+                    <h5>Notes</h5>
+                    <div style="font-size:12px;color:var(--muted);line-height:1.7">${ver.notes||'—'}</div>
+                  </div>
+                </div>
+                ${ver.outcome ? `<div class="version-outcome"><div class="version-outcome-label">Outcome</div>${ver.outcome}</div>` : ''}
+              </div>
+            </div>`;
+          }).join('') : '<div style="font-size:12px;color:var(--muted)">No versions yet — hit "+ Version" to add the first.</div>'}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function calcCogs(ingredients) {
+  return (ingredients || []).reduce((s, i) => s + (parseFloat(i.cost) || 0), 0);
+}
+
+function toggleLab(id) { document.getElementById('lab-expand-'+id).classList.toggle('open'); }
+function toggleVersion(id) { document.getElementById('vbody-'+id).classList.toggle('open'); }
+
+function applyLabFilters() {
+  const q = document.getElementById('lab-search').value.toLowerCase();
+  renderLab(labData.filter(e =>
+    (labFilter === 'all' || e.status === labFilter) &&
+    (!q || [e.name, e.description, e.productType].join(' ').toLowerCase().includes(q))
+  ));
+}
+
+function setLabFilter(btn, f) {
+  document.querySelectorAll('#page-lab .filter-chip').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active'); labFilter = f; applyLabFilters();
+}
+
+/* ══════════════════════════════════════════════════════════
+   EXPERIMENT MODAL
+══════════════════════════════════════════════════════════ */
+function openLabModal(editId) {
+  const exp = editId ? labData.find(e => e.id === editId) : null;
+  document.getElementById('lab-modal-title').textContent = exp ? 'Edit Experiment' : 'New Experiment';
+  document.getElementById('lab-modal-subtitle').textContent = exp ? exp.name : 'Define a new recipe experiment';
+  document.getElementById('lab-submit-btn').textContent = exp ? 'Update Experiment' : 'Create Experiment';
+  document.getElementById('lab-editing-id').value = editId || '';
+  document.getElementById('lab-name').value = exp ? exp.name : '';
+  document.getElementById('lab-desc').value = exp ? (exp.description || '') : '';
+  const typeEl = document.getElementById('lab-type');
+  if (exp) Array.from(typeEl.options).forEach((o,i) => { if (o.value === exp.productType) typeEl.selectedIndex = i; });
+  else typeEl.selectedIndex = 0;
+  const statusEl = document.getElementById('lab-status');
+  if (exp) Array.from(statusEl.options).forEach((o,i) => { if (o.value === exp.status) statusEl.selectedIndex = i; });
+  else statusEl.selectedIndex = 0;
+  document.getElementById('modal-lab').classList.add('open');
+}
+function closeLabModal() { document.getElementById('modal-lab').classList.remove('open'); }
+
+async function saveExperiment() {
+  const name = document.getElementById('lab-name').value.trim(); if (!name) return;
+  const btn = document.getElementById('lab-submit-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const editId = document.getElementById('lab-editing-id').value;
+  const row = {
+    user_id: currentUser.id, name,
+    description: document.getElementById('lab-desc').value,
+    product_type: document.getElementById('lab-type').value,
+    status: document.getElementById('lab-status').value,
+    updated_at: new Date().toISOString()
+  };
+  let error;
+  if (editId) { ({ error } = await sb.from('lab_experiments').update(row).eq('id', editId)); }
+  else { ({ error } = await sb.from('lab_experiments').insert(row)); }
+  btn.disabled = false; btn.textContent = editId ? 'Update Experiment' : 'Create Experiment';
+  if (error) { showToast('Error — ' + error.message); return; }
+  showToast(editId ? 'Experiment updated ✦' : 'Experiment created ✦');
+  closeLabModal();
+  await loadLabData();
+}
+
+/* ══════════════════════════════════════════════════════════
+   VERSION MODAL
+══════════════════════════════════════════════════════════ */
+function openVersionModal(experimentId, editVersionId) {
+  const exp = labData.find(e => e.id === experimentId); if (!exp) return;
+  const ver = editVersionId ? exp.versions.find(v => v.id === editVersionId) : null;
+  document.getElementById('version-modal-title').textContent = ver ? `Edit Version ${ver.versionNumber}` : 'New Version';
+  document.getElementById('version-modal-subtitle').textContent = exp.name;
+  document.getElementById('ver-submit-btn').textContent = ver ? 'Update Version' : 'Save Version';
+  document.getElementById('ver-experiment-id').value = experimentId;
+  document.getElementById('ver-editing-id').value = editVersionId || '';
+  document.getElementById('ver-label').value = ver ? (ver.label || '') : '';
+  document.getElementById('ver-recipe').value = ver ? (ver.recipeSteps || []).join('\n') : '';
+  document.getElementById('ver-notes').value = ver ? (ver.notes || '') : '';
+  document.getElementById('ver-outcome').value = ver ? (ver.outcome || '') : '';
+
+  // Populate copy-from dropdown
+  const copyFrom = document.getElementById('ver-copy-from');
+  copyFrom.innerHTML = '<option value="">— start fresh —</option>' +
+    exp.versions.map(v => `<option value="${v.id}">v${v.versionNumber} — ${v.label || 'Version '+v.versionNumber}</option>`).join('');
+
+  // Clear and populate ingredient rows
+  document.getElementById('ver-ing-rows').innerHTML = ''; verIngRowCount = 0;
+  if (ver && ver.ingredients.length) ver.ingredients.forEach(i => addVerIngRow(i));
+  else addVerIngRow();
+
+  document.getElementById('modal-version').classList.add('open');
+}
+
+function closeVersionModal() { document.getElementById('modal-version').classList.remove('open'); }
+
+function copyVersionData() {
+  const verId = document.getElementById('ver-copy-from').value;
+  if (!verId) return;
+  const expId = document.getElementById('ver-experiment-id').value;
+  const exp = labData.find(e => e.id === expId); if (!exp) return;
+  const ver = exp.versions.find(v => v.id === verId); if (!ver) return;
+  document.getElementById('ver-recipe').value = (ver.recipeSteps || []).join('\n');
+  document.getElementById('ver-notes').value = '';
+  document.getElementById('ver-outcome').value = '';
+  document.getElementById('ver-ing-rows').innerHTML = ''; verIngRowCount = 0;
+  (ver.ingredients || []).forEach(i => addVerIngRow(i));
+  if (!ver.ingredients.length) addVerIngRow();
+  showToast('Copied from ' + (ver.label || 'Version ' + ver.versionNumber));
+}
+
+function addVerIngRow(data) {
+  const id = verIngRowCount++;
+  const d = data || {};
+  const row = document.createElement('div');
+  row.className = 'ing-row'; row.id = 'ver-ing-row-'+id;
+  row.innerHTML = `<div class="ing-cell"><input placeholder="e.g. Cacao paste" value="${d.name||''}"></div><div class="ing-cell"><input placeholder="60g" value="${d.amount||''}"></div><div class="ing-cell"><input placeholder="1.20" type="number" step="0.01" value="${d.cost||''}"></div><div class="ing-cell"><input placeholder="Supplier" value="${d.supplier||''}"></div><div class="ing-cell"><input placeholder="25kg" value="${d.moq||''}"></div><div class="ing-cell"><input placeholder="https://…" value="${d.url||''}"></div><button class="ing-remove" onclick="document.getElementById('ver-ing-row-${id}').remove()">×</button>`;
+  document.getElementById('ver-ing-rows').appendChild(row);
+}
+
+function getVerIngredients() {
+  return Array.from(document.querySelectorAll('#ver-ing-rows .ing-row')).map(row => {
+    const inputs = row.querySelectorAll('input');
+    return { name: inputs[0].value.trim(), amount: inputs[1].value.trim(), cost: parseFloat(inputs[2].value)||0, supplier: inputs[3].value.trim(), moq: inputs[4].value.trim(), url: inputs[5].value.trim() };
+  }).filter(i => i.name);
+}
+
+async function saveVersion() {
+  const experimentId = document.getElementById('ver-experiment-id').value;
+  const editId = document.getElementById('ver-editing-id').value;
+  const btn = document.getElementById('ver-submit-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const exp = labData.find(e => e.id === experimentId);
+  const nextNum = editId ? exp.versions.find(v => v.id === editId).versionNumber : (exp.versions.length + 1);
+  const row = {
+    experiment_id: experimentId,
+    version_number: nextNum,
+    label: document.getElementById('ver-label').value,
+    notes: document.getElementById('ver-notes').value,
+    outcome: document.getElementById('ver-outcome').value,
+    recipe_steps: JSON.stringify(document.getElementById('ver-recipe').value.split('\n').filter(Boolean)),
+    ingredients: JSON.stringify(getVerIngredients())
+  };
+  let error;
+  if (editId) { ({ error } = await sb.from('lab_versions').update(row).eq('id', editId)); }
+  else { ({ error } = await sb.from('lab_versions').insert(row)); }
+  btn.disabled = false; btn.textContent = editId ? 'Update Version' : 'Save Version';
+  if (error) { showToast('Error — ' + error.message); return; }
+  showToast(editId ? 'Version updated ✦' : 'Version saved ✦');
+  closeVersionModal();
+  await loadLabData();
+}
+
+/* ══════════════════════════════════════════════════════════
+   PROMOTE TO PRODUCTION
+══════════════════════════════════════════════════════════ */
+async function promoteToProduction(experimentId) {
+  const exp = labData.find(e => e.id === experimentId); if (!exp) return;
+  if (!confirm(`Promote "${exp.name}" to Production Ready? This will create a new product entry.`)) return;
+  const latestVer = exp.versions[exp.versions.length - 1];
+  const productRow = {
+    user_id: currentUser.id,
+    name: exp.name,
+    tagline: exp.productType,
+    cat: exp.productType,
+    icon: '🍫',
+    images: JSON.stringify([]),
+    recipe: latestVer ? latestVer.recipe_steps || JSON.stringify(latestVer.recipeSteps) : JSON.stringify([]),
+    notes: latestVer ? `Promoted from Lab. ${latestVer.notes || ''}` : 'Promoted from Lab.',
+  };
+  const { data: newProduct, error } = await sb.from('products').insert(productRow).select().single();
+  if (error) { showToast('Error — ' + error.message); return; }
+  // Copy ingredients
+  if (latestVer && latestVer.ingredients.length) {
+    await sb.from('ingredients').insert(latestVer.ingredients.map(i => ({ product_id: newProduct.id, ...i, cost: parseFloat(i.cost)||null })));
+  }
+  // Mark experiment as promoted
+  await sb.from('lab_experiments').update({ status: 'Abandoned' }).eq('id', experimentId);
+  showToast(`"${exp.name}" promoted to Production Ready ✦`);
+  await loadLabData();
+  await loadAllData();
+  showPage('production', document.querySelector('.nav-dropdown-item[onclick*="production"]'));
 }
 
 /* Init */
