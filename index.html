@@ -348,7 +348,10 @@ input[type="file"] { display: none; }
 .version-section h5 { font-size: 9px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); margin-bottom: 8px; }
 .version-outcome { margin-top: 12px; padding: 10px 12px; background: var(--parchment); border-radius: var(--radius); border-left: 3px solid var(--gold); font-size: 12px; color: var(--ink); line-height: 1.6; }
 .version-outcome-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 4px; }
-.compare-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 500px; }
+.custom-tags-strip { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; min-height: 0; }
+.custom-tag { display: flex; align-items: center; gap: 5px; padding: 4px 10px; background: var(--ink); color: var(--cream); border-radius: 5px; font-size: 11px; }
+.custom-tag-remove { cursor: pointer; opacity: 0.6; font-size: 13px; line-height: 1; }
+.custom-tag-remove:hover { opacity: 1; } font-size: 12px; min-width: 500px; }
 .compare-table th { background: var(--ink); color: var(--cream); padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 400; letter-spacing: 0.05em; white-space: nowrap; }
 .compare-table th.ver-col { text-align: center; min-width: 120px; }
 .compare-table td { padding: 8px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
@@ -760,8 +763,9 @@ input[type="file"] { display: none; }
           <input type="hidden" id="p-format" value="">
           <div class="custom-input-row" style="margin-top:8px">
             <input class="fi" id="p-format-custom-val" placeholder="Other format…">
-            <button class="add-custom-btn" onclick="selectAttrCustom('p-format','p-format-custom-val')">Use this</button>
+            <button class="add-custom-btn" onclick="selectAttrCustom('p-format','p-format-custom-val','custom-tags-format')">Use this</button>
           </div>
+          <div id="custom-tags-format" class="custom-tags-strip"></div>
         </div>
       </div>
 
@@ -829,8 +833,9 @@ input[type="file"] { display: none; }
         <input type="hidden" id="p-profile" value="">
         <div class="custom-input-row" style="margin-top:8px">
           <input class="fi" id="p-profile-custom-val" placeholder="Other profile…">
-          <button class="add-custom-btn" onclick="selectAttrCustom('p-profile','p-profile-custom-val')">Use this</button>
+          <button class="add-custom-btn" onclick="selectAttrCustom('p-profile','p-profile-custom-val','custom-tags-profile')">Use this</button>
         </div>
+        <div id="custom-tags-profile" class="custom-tags-strip"></div>
       </div>
 
       <!-- ROW 4: Closure mechanism -->
@@ -877,8 +882,9 @@ input[type="file"] { display: none; }
         <input type="hidden" id="p-closure" value="">
         <div class="custom-input-row" style="margin-top:8px">
           <input class="fi" id="p-closure-custom-val" placeholder="Other closure…">
-          <button class="add-custom-btn" onclick="selectAttrCustom('p-closure','p-closure-custom-val')">Use this</button>
+          <button class="add-custom-btn" onclick="selectAttrCustom('p-closure','p-closure-custom-val','custom-tags-closure')">Use this</button>
         </div>
+        <div id="custom-tags-closure" class="custom-tags-strip"></div>
       </div>
 
       <!-- ROW 5: Inner wrapping -->
@@ -1439,6 +1445,7 @@ function openPackModal() {
   currentFormats = []; currentProfiles = []; currentClosures = [];
   ['p-brand','p-desc','p-what-works','p-what-to-borrow','p-what-doesnt-work',
    'p-format-custom-val','p-profile-custom-val','p-closure-custom-val'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  ['custom-tags-format','custom-tags-profile','custom-tags-closure'].forEach(id => { const el = document.getElementById(id); if(el) el.innerHTML=''; });
   ['p-size','p-orient','p-inner'].forEach(id => document.getElementById(id).selectedIndex = 0);
   ['p-format','p-profile','p-closure'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
   document.querySelectorAll('.attr-visual-opt').forEach(el => el.classList.remove('selected'));
@@ -1621,16 +1628,31 @@ function selectAttr(el, hiddenId, val) {
   }
 }
 
-function selectAttrCustom(hiddenId, inputId) {
+function selectAttrCustom(hiddenId, inputId, tagsContainerId) {
   const val = document.getElementById(inputId).value.trim();
   if (!val) return;
   const inputEl = document.getElementById(inputId);
   if (hiddenId === 'p-format') { if (!currentFormats.includes(val)) currentFormats.push(val); }
   if (hiddenId === 'p-profile') { if (!currentProfiles.includes(val)) currentProfiles.push(val); }
   if (hiddenId === 'p-closure') { if (!currentClosures.includes(val)) currentClosures.push(val); }
+  // Show tag
+  if (tagsContainerId) {
+    const strip = document.getElementById(tagsContainerId);
+    if (strip) {
+      const tag = document.createElement('span');
+      tag.className = 'custom-tag';
+      tag.innerHTML = `${val} <span class="custom-tag-remove" onclick="removeCustomTag(this,'${hiddenId}','${val}','${tagsContainerId}')">×</span>`;
+      strip.appendChild(tag);
+    }
+  }
   inputEl.value = '';
-  inputEl.style.borderColor = 'var(--sage)';
-  setTimeout(() => { inputEl.style.borderColor = ''; }, 1000);
+}
+
+function removeCustomTag(el, hiddenId, val, tagsContainerId) {
+  if (hiddenId === 'p-format') currentFormats = currentFormats.filter(v => v !== val);
+  if (hiddenId === 'p-profile') currentProfiles = currentProfiles.filter(v => v !== val);
+  if (hiddenId === 'p-closure') currentClosures = currentClosures.filter(v => v !== val);
+  el.closest('.custom-tag').remove();
 }
 
 function toggleGraphicEl(el, val) {
