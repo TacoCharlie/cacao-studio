@@ -1624,15 +1624,10 @@ function selectAttr(el, hiddenId, val) {
 function selectAttrCustom(hiddenId, inputId) {
   const val = document.getElementById(inputId).value.trim();
   if (!val) return;
-  // Deselect any visual options in the same section
   const inputEl = document.getElementById(inputId);
-  const section = inputEl.closest('.modal-section') || inputEl.closest('.fg');
-  if (section) section.querySelectorAll('.attr-visual-opt').forEach(o => o.classList.remove('selected'));
-  const hidden = document.getElementById(hiddenId);
   if (hiddenId === 'p-format') { if (!currentFormats.includes(val)) currentFormats.push(val); }
   if (hiddenId === 'p-profile') { if (!currentProfiles.includes(val)) currentProfiles.push(val); }
   if (hiddenId === 'p-closure') { if (!currentClosures.includes(val)) currentClosures.push(val); }
-  // Clear the input after use
   inputEl.value = '';
   inputEl.style.borderColor = 'var(--sage)';
   setTimeout(() => { inputEl.style.borderColor = ''; }, 1000);
