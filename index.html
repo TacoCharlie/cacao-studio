@@ -2340,8 +2340,14 @@ function closeBriefDetail() { document.getElementById('brief-detail-overlay').cl
 
 async function saveBriefEdits(id) {
   if (!id) return;
-  const content = document.getElementById('brief-editable').innerHTML;
+  // Save the inner text (preserves edits as plain text/markdown-ish)
+  // We store the current HTML but strip it back to text for re-rendering
+  const editable = document.getElementById('brief-editable');
+  const content = editable.innerText; // plain text preserves edits
   await sb.from('briefs').update({ brief_content: content, updated_at: new Date().toISOString() }).eq('id', id);
+  // Update local cache
+  const b = briefsData.find(x => x.id === id);
+  if (b) b.brief_content = content;
   showToast('Brief saved ✦');
 }
 
