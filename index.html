@@ -461,18 +461,8 @@ input[type="file"] { display: none; }
     <div class="dir-section-label">
       <div><div class="dir-section-title">What we've observed</div><div class="dir-section-sub">Synthesised from your packaging catalogue</div></div>
     </div>
-    <div id="dir-insights-hero" style="margin-bottom:20px">
-      <div style="font-size:12px;color:var(--muted);padding:20px 0">Add packaging concepts and rate attributes to see insights here.</div>
-    </div>
-    <div class="dir-two-col" style="margin-bottom:28px">
-      <div class="dir-card">
-        <h3>Attribute ratings</h3>
-        <div id="liked-summary" style="margin-top:8px"><div style="font-size:12px;color:var(--muted)">No data yet.</div></div>
-      </div>
-      <div class="dir-card">
-        <h3>Catalogue breakdown</h3>
-        <div id="dir-breakdown" style="margin-top:8px"><div style="font-size:12px;color:var(--muted)">No concepts yet.</div></div>
-      </div>
+    <div id="dir-insights-hero" style="margin-bottom:28px">
+      <div style="font-size:12px;color:var(--muted);padding:20px 0">Add packaging concepts and fill in observations to see insights here.</div>
     </div>
     <div class="dir-section-label" style="margin-top:12px">
       <div><div class="dir-section-title">Evoke Chocolate — Brand Foundation</div><div class="dir-section-sub">Click any field to edit · saves automatically</div></div>
@@ -1399,80 +1389,21 @@ async function editPackagingConcept() {
 function updatePackStats() {
   document.getElementById('pack-count').textContent = packagingData.length;
 
-  // Weighted attribute scores (Love=3pts, Like=2pts, Interesting=1pt)
-  const scores = {};
-  const counts = {};
-  packagingData.forEach(p => {
-    Object.entries(p.tagRatings || {}).forEach(([attr, rating]) => {
-      if (rating > 0) {
-        scores[attr] = (scores[attr] || 0) + rating;
-        counts[attr] = (counts[attr] || 0) + 1;
-      }
-    });
-  });
-
-  // Attribute ratings panel
-  const likedEl = document.getElementById('liked-summary');
-  if (!Object.keys(scores).length) {
-    likedEl.innerHTML = '<div style="font-size:12px;color:var(--muted)">No ratings yet.</div>';
-  } else {
-    const sorted = Object.entries(scores).sort((a,b) => b[1]-a[1]);
-    const max = sorted[0][1];
-    likedEl.innerHTML = sorted.map(([k, score]) => {
-      const avg = score / counts[k];
-      const fillClass = avg >= 2.5 ? 'liked-insight-fill-3' : avg >= 1.5 ? 'liked-insight-fill-2' : 'liked-insight-fill-1';
-      return `<div class="liked-insight-row">
-        <span class="liked-insight-name">${ATTR_LABELS[k]||k}</span>
-        <div class="liked-insight-bar"><div class="${fillClass}" style="width:${Math.round((score/max)*100)}%"></div></div>
-        <span class="liked-insight-score">${avg >= 2.5 ? '♥♥♥' : avg >= 1.5 ? '♥♥' : '♥'}</span>
-      </div>`;
-    }).join('');
-  }
-
-  // Breakdown panel
-  const bdEl = document.getElementById('dir-breakdown');
-  if (!packagingData.length) {
-    bdEl.innerHTML = '<div style="font-size:12px;color:var(--muted)">No concepts yet.</div>';
-  } else {
-    const artCounts = {}, enclosureCounts = {}, innerCounts = {};
-    packagingData.forEach(p => {
-      if (p.art) artCounts[p.art] = (artCounts[p.art]||0)+1;
-      if (p.enclosure) enclosureCounts[p.enclosure] = (enclosureCounts[p.enclosure]||0)+1;
-      if (p.inner) innerCounts[p.inner] = (innerCounts[p.inner]||0)+1;
-    });
-    const topArt = Object.entries(artCounts).sort((a,b)=>b[1]-a[1])[0];
-    const topEnc = Object.entries(enclosureCounts).sort((a,b)=>b[1]-a[1])[0];
-    const topInn = Object.entries(innerCounts).sort((a,b)=>b[1]-a[1])[0];
-    const allColors = [...new Set(packagingData.flatMap(p=>p.colors||[]))];
-    bdEl.innerHTML = `
-      <div class="breakdown-row"><span class="breakdown-key">Concepts</span><span class="breakdown-val">${packagingData.length}</span></div>
-      <div class="breakdown-row"><span class="breakdown-key">Dominant style</span><span class="breakdown-val">${topArt?topArt[0]:'—'}</span></div>
-      <div class="breakdown-row"><span class="breakdown-key">Top enclosure</span><span class="breakdown-val">${topEnc?topEnc[0]:'—'}</span></div>
-      <div class="breakdown-row"><span class="breakdown-key">Top inner wrap</span><span class="breakdown-val">${topInn?topInn[0]:'—'}</span></div>
-      <div class="breakdown-row"><span class="breakdown-key">Colours in pool</span><span class="breakdown-val">${allColors.length}</span></div>`;
-  }
-
-  // Insights hero
+  // Insights hero — colour territory and what to borrow only
   const heroEl = document.getElementById('dir-insights-hero');
-  if (!packagingData.length || !Object.keys(scores).length) {
-    heroEl.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:20px 0">Add packaging concepts and rate attributes to see insights here.</div>';
+  if (!packagingData.length) {
+    heroEl.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:20px 0">Add packaging concepts and fill in observations to see insights here.</div>';
     return;
   }
-  const topAttrs = Object.entries(scores).sort((a,b)=>b[1]-a[1]).slice(0,4);
-  const allColors = [...new Set(packagingData.flatMap(p=>p.colors||[]))].slice(0,8);
 
-  // Gather "what to borrow" snippets
-  const borrowSnippets = packagingData.filter(p=>p.whatToBorrow).map(p=>`<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--ink);line-height:1.5"><span style="font-size:10px;color:var(--muted);display:block;margin-bottom:2px">${p.brand}</span>${p.whatToBorrow}</div>`);
+  const allColors = [...new Set(packagingData.flatMap(p => p.colors||[]))].slice(0, 10);
+  const borrowSnippets = packagingData.filter(p => p.whatToBorrow).map(p =>
+    `<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--ink);line-height:1.5">
+      <span style="font-size:10px;color:var(--muted);display:block;margin-bottom:2px">${p.brand}</span>
+      ${p.whatToBorrow}
+    </div>`);
 
   heroEl.innerHTML = `
-    <div class="dir-insights-strip">
-      ${topAttrs.map(([k,score])=>`
-        <div class="dir-insight-card">
-          <div class="dir-insight-label">Top rated</div>
-          <div class="dir-insight-value">${ATTR_LABELS[k]||k}</div>
-          <div class="dir-insight-sub">Score: ${score} across ${counts[k]} concept${counts[k]>1?'s':''}</div>
-        </div>`).join('')}
-    </div>
     ${allColors.length ? `
     <div class="dir-card" style="margin-bottom:16px">
       <h3>Colour territory across catalogue</h3>
