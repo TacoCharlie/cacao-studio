@@ -644,6 +644,30 @@ input[type="file"] { display: none; }
   </div>
 </div>
 
+<!-- REGENERATE BRIEF MODAL -->
+<div class="modal-overlay" id="modal-regenerate" onclick="if(event.target===this)closeRegenerateModal()">
+  <div class="modal" style="width:min(700px,94vw)" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title">Regenerate Brief</div>
+      <button class="modal-x" onclick="closeRegenerateModal()">✕</button>
+    </div>
+    <div class="modal-subtitle" id="regen-modal-subtitle"></div>
+    <div class="fg">
+      <label class="fl">What to change or improve <span style="font-weight:300;text-transform:none;font-size:11px;letter-spacing:0">— Claude will read your previous brief and focus on these changes</span></label>
+      <textarea class="fta" id="regen-changes" placeholder="e.g. Make the colour palette warmer and more specific. Be more decisive about the closure mechanism. Add more detail to the typography section…" style="min-height:90px"></textarea>
+    </div>
+    <div class="fg">
+      <label class="fl">Additional direction</label>
+      <textarea class="fta" id="regen-extra" placeholder="Any other constraints or context…"></textarea>
+    </div>
+    <div class="fg">
+      <label class="fl">References</label>
+      <div id="regen-ref-selector" style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto;border:1px solid var(--border-md);border-radius:var(--radius);padding:8px"></div>
+    </div>
+    <button class="submit-btn" id="regen-btn" onclick="executeRegenerate()">Regenerate Brief</button>
+  </div>
+</div>
+
 <!-- NEW BRIEF MODAL -->
 <div class="modal-overlay" id="modal-brief" onclick="if(event.target===this)closeBriefModal()">
   <div class="modal" style="width:min(700px,94vw)" onclick="event.stopPropagation()">
@@ -2370,14 +2394,129 @@ async function saveBriefEdits(id) {
 async function regenerateBrief() {
   if (!currentBriefId) return;
   const b = briefsData.find(x => x.id === currentBriefId); if (!b) return;
-  // Re-open the modal pre-filled
-  closeBriefDetail();
-  openBriefModal();
-  document.getElementById('brief-name').value = b.name;
+
+  document.getElementById('regen-modal-subtitle').textContent = b.name;
+  document.getElementById('regen-changes').value = '';
+  document.getElementById('regen-extra').value = '';
+
+  // Populate reference selector pre-checked from last time
   const refIds = b.reference_ids ? JSON.parse(b.reference_ids) : [];
-  document.querySelectorAll('#brief-ref-selector input').forEach(cb => {
-    cb.checked = refIds.includes(cb.value);
-  });
+  const sel = document.getElementById('regen-ref-selector');
+  sel.innerHTML = packagingData.map(p => `
+    <label class="ref-selector-item">
+      <input type="checkbox" value="${p.id}" ${refIds.includes(p.id) ? 'checked' : ''}>
+      ${p.images && p.images[0] ? `<img class="ref-selector-thumb" src="${p.images[0]}" alt="">` : `<div class="ref-selector-thumb"></div>`}
+      <div>
+        <div class="ref-selector-name">${p.brand}</div>
+        <div class="ref-selector-meta">${p.desc || ''}</div>
+      </div>
+    </label>`).join('');
+
+  document.getElementById('modal-regenerate').classList.add('open');
+}
+
+function closeRegenerateModal() { document.getElementById('modal-regenerate').classList.remove('open'); }
+
+async function executeRegenerate() {
+  if (!currentBriefId) return;
+  const b = briefsData.find(x => x.id === currentBriefId); if (!b) return;
+
+  const changes = document.getElementById('regen-changes').value;
+  const extra = document.getElementById('regen-extra').value;
+  const selectedRefIds = Array.from(document.querySelectorAll('#regen-ref-selector input:checked')).map(cb => cb.value);
+  if (!selectedRefIds.length) { showToast('Select at least one reference'); return; }
+
+  const btn = document.getElementById('regen-btn');
+  btn.disabled = true; btn.textContent = 'Generating…';
+  closeRegenerateModal();
+
+  document.getElementById('brief-detail-content').innerHTML = `
+    <div class="brief-generating">
+      <div class="brief-spinner"></div>
+      Claude is reading your feedback and rewriting the brief…
+    </div>`;
+
+  const selectedRefs = packagingData.filter(p => selectedRefIds.includes(p.id));
+  const brandEl = {
+    story: document.getElementById('bf-origin-story')?.value || '',
+    mission: document.getElementById('bf-mission')?.value || '',
+    tone: document.getElementById('bf-tone')?.value || '',
+    target: document.getElementById('bf-target')?.value || '',
+    price: document.getElementById('bf-price')?.value || '',
+    design: document.getElementById('bf-design-notes')?.value || ''
+  };
+
+  const refsText = selectedRefs.map(p => `
+REFERENCE: ${p.brand}${p.desc ? ' — ' + p.desc : ''}
+Format: ${(p.format||[]).join(', ')||'—'}
+Profile: ${(p.profile||[]).join(', ')||'—'}
+Closure: ${(p.closure||[]).join(', ')||'—'}
+Inner wrap: ${p.inner||'—'}
+Graphic elements: ${(p.graphicElements||[]).join(', ')||'—'}
+Colours: ${(p.colors||[]).join(', ')||'—'}
+What works: ${p.whatWorks||'—'}
+What to borrow for Evoke: ${p.whatToBorrow||'—'}
+What doesn't work: ${p.whatDoesntWork||'—'}`).join('\n---\n');
+
+  const previousBrief = b.brief_content ? `\nPREVIOUS VERSION OF THIS BRIEF:\n${b.brief_content.slice(0, 3000)}` : '';
+
+  const prompt = `You are a senior packaging designer and creative director working with Evoke Chocolate. You previously wrote a packaging brief for "${b.name}". You are now revising it based on feedback.
+${previousBrief}
+
+BRAND FOUNDATION:
+${brandEl.story ? 'Brand story: ' + brandEl.story : ''}
+${brandEl.mission ? 'Mission: ' + brandEl.mission : ''}
+${brandEl.tone ? 'Tone of voice: ' + brandEl.tone : ''}
+${brandEl.target ? 'Target customer: ' + brandEl.target : ''}
+${brandEl.price ? 'Price positioning: ' + brandEl.price : ''}
+${brandEl.design ? 'Design direction notes: ' + brandEl.design : ''}
+
+CATALOGUE REFERENCES (${selectedRefs.length} concepts):
+${refsText}
+
+${changes ? `WHAT TO CHANGE OR IMPROVE:\n${changes}\n` : ''}
+${extra ? `ADDITIONAL DIRECTION:\n${extra}\n` : ''}
+
+Rewrite the complete packaging brief incorporating this feedback. Keep what was working well, improve what was flagged. Use these exact section headings:
+## Product
+## Packaging Format & Structure
+## Visual Direction
+## Colour Palette
+## Typography
+## Tone & Mood
+## Key References
+## Specific Directions
+## What to Avoid`;
+
+  try {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-brief`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_KEY}` },
+      body: JSON.stringify({ prompt })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error?.message || JSON.stringify(data));
+    if (!data.content || !data.content[0]) throw new Error('Unexpected response: ' + JSON.stringify(data));
+    const briefText = data.content[0].text;
+
+    // Save as new brief version
+    const row = {
+      user_id: currentUser.id,
+      name: b.name,
+      product_id: b.product_id,
+      reference_ids: JSON.stringify(selectedRefIds),
+      brief_content: briefText,
+      status: 'Draft'
+    };
+    const { data: saved } = await sb.from('briefs').insert(row).select().single();
+    if (saved) { briefsData.unshift(saved); currentBriefId = saved.id; }
+    renderBriefs();
+    renderBriefContent(b.name, briefText, selectedRefs);
+  } catch(err) {
+    document.getElementById('brief-detail-content').innerHTML = `<div style="padding:20px;color:#c0392b">Error: ${err.message}</div>`;
+  }
+
+  btn.disabled = false; btn.textContent = 'Regenerate Brief';
 }
 
 /* ══════════════════════════════════════════════════════════
