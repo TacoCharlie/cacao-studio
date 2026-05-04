@@ -2246,8 +2246,13 @@ Be concrete, opinionated, and specific. Reference actual elements from the catal
 }
 
 function renderBriefContent(name, text, refs) {
+  // First inject colour swatches into raw text (before HTML conversion)
+  let processed = text.replace(/#([0-9a-fA-F]{6})\b/g, (match, hex) =>
+    `SWATCH_${hex}_SWATCH${match}`
+  );
+
   // Convert markdown to HTML with better spacing
-  let html = text
+  let html = processed
     .replace(/^## (.+)$/gm, '<h2>$1</h2>')
     .replace(/^### (.+)$/gm, '<h3>$1</h3>')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
@@ -2262,20 +2267,9 @@ function renderBriefContent(name, text, refs) {
     .join('\n')
     .trim();
 
-  // Extract hex colours and replace with swatch+code
-  html = html.replace(/`(#[0-9a-fA-F]{6})`/g, (match, hex) =>
-    `<span style="display:inline-flex;align-items:center;gap:4px;vertical-align:middle">
-      <span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:${hex};border:1px solid rgba(0,0,0,0.1);flex-shrink:0"></span>
-      <code style="font-size:11px;color:var(--muted)">${hex}</code>
-    </span>`
-  );
-
-  // Also handle hex colours without backticks like #304830
-  html = html.replace(/(?<!["#a-zA-Z])(#[0-9a-fA-F]{6})(?![0-9a-fA-F])/g, (match, hex) =>
-    `<span style="display:inline-flex;align-items:center;gap:4px;vertical-align:middle">
-      <span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:${hex};border:1px solid rgba(0,0,0,0.1);flex-shrink:0"></span>
-      <code style="font-size:11px;color:var(--muted)">${hex}</code>
-    </span>`
+  // Now safely replace swatch placeholders with HTML (no risk of regex re-matching)
+  html = html.replace(/SWATCH_([0-9a-fA-F]{6})_SWATCH(#[0-9a-fA-F]{6})/g, (match, hex, original) =>
+    `<span style="display:inline-flex;align-items:center;gap:4px;vertical-align:middle"><span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#${hex};border:1px solid rgba(0,0,0,0.1);flex-shrink:0"></span><code style="font-size:11px;color:var(--muted)">#${hex}</code></span>`
   );
 
   const briefId = currentBriefId;
