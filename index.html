@@ -2077,7 +2077,7 @@ function applyProdFilters() {
 /* ══════════════════════════════════════════════════════════
    BRIEFS
 ══════════════════════════════════════════════════════════ */
-const ANTHROPIC_KEY = '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';
+// API key stored securely in Supabase Edge Function secrets
 let briefsData = [];
 let currentBriefId = null;
 
@@ -2206,19 +2206,13 @@ Structure your response with these exact section headings:
 Be concrete, opinionated, and specific. Reference actual elements from the catalogue where relevant. The brief should feel like it was written by someone who deeply understands both the brand and the references.`;
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-brief`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
+        'Authorization': `Bearer ${SUPABASE_KEY}`
       },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 2000,
-        messages: [{ role: 'user', content: prompt }]
-      })
+      body: JSON.stringify({ prompt })
     });
 
     const data = await response.json();
