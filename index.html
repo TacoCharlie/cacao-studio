@@ -2306,17 +2306,17 @@ Be concrete, opinionated, and specific. Reference actual elements from the catal
 }
 
 function renderBriefContent(name, text, refs) {
-  // Extract palette JSON block before any other processing
+  // Extract palette JSON block — handle various formats Claude might use
   let paletteHTML = '';
-  let processedText = text.replace(/```palette\s*([\s\S]*?)```/g, (match, json) => {
-    try {
-      const data = JSON.parse(json.trim());
-      if (data.palette && data.palette.length) {
-        paletteHTML = renderPaletteStrip(data.palette);
-      }
-    } catch(e) {}
-    return ''; // Remove from text
-  });
+  let processedText = text
+    .replace(/```palette\s*([\s\S]*?)```/g, (match, json) => {
+      try { const d = JSON.parse(json.trim()); if (d.palette) paletteHTML = renderPaletteStrip(d.palette); } catch(e) {}
+      return '';
+    })
+    .replace(/```json\s*([\s\S]*?)```/g, (match, json) => {
+      try { const d = JSON.parse(json.trim()); if (d.palette) { paletteHTML = renderPaletteStrip(d.palette); return ''; } } catch(e) {}
+      return match; // keep if not a palette block
+    });
 
   // Inject colour swatches into raw text before HTML conversion
   processedText = processedText.replace(/#([0-9a-fA-F]{6})\b/g, (match, hex) =>
@@ -2330,7 +2330,6 @@ function renderBriefContent(name, text, refs) {
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/^- (.+)$/gm, '<li>$1</li>')
     .replace(/(<li>.*<\/li>\n?)+/gs, m => `<ul>${m}</ul>`)
-    // Split on lines that start with a bold label (e.g. **Brand:**)
     .replace(/\n(<strong>[^<]+<\/strong>)/g, '</p><p>$1')
     .split('\n\n')
     .map(block => {
@@ -2346,33 +2345,52 @@ function renderBriefContent(name, text, refs) {
     `<span style="display:inline-flex;align-items:center;gap:4px;vertical-align:middle"><span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#${hex};border:1px solid rgba(0,0,0,0.1);flex-shrink:0"></span><code style="font-size:11px;color:var(--muted)">#${hex}</code></span>`
   );
 
-  // Inject palette strip after the Colour Palette heading
+  // Inject palette strip after Colour Palette heading
   if (paletteHTML) {
-    html = html.replace('<h2>Colour Palette</h2>', `<h2>Colour Palette</h2>${paletteHTML}`);
+    if (html.includes('<h2>Colour Palette</h2>')) {
+      html = html.replace('<h2>Colour Palette</h2>', `<h2>Colour Palette</h2>${paletteHTML}`);
+    } else {
+      // find any colour palette-like heading
+      html = html.replace(/<h2>([^<]*[Cc]olou?r[^<]*)<\/h2>/, `<h2>$1</h2>${paletteHTML}`);
+    }
   }
 
-  // Inject reference image strip under Key References heading
-  if (refs.length) {
-    const refStrip = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin:14px 0 20px">
-      ${refs.map(r => {
-        if (!r) return '';
-        const hasImg = r.images && r.images[0];
-        return `<div onclick="openDetail('${r.id}')" style="cursor:pointer;border-radius:8px;overflow:hidden;border:1px solid var(--border);transition:transform .15s" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
-          <div style="width:100%;aspect-ratio:1;background:var(--parchment);position:relative">
-            ${hasImg ? `<img src="${r.images[0]}" alt="${r.brand}" style="width:100%;height:100%;object-fit:cover;display:block;position:absolute;inset:0" onerror="this.style.display='none'">` : ''}
-            <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:10px;color:var(--muted);text-align:center;padding:8px">${r.brand}</div>
-          </div>
-          <div style="padding:6px 8px;background:#fff">
-            <div style="font-size:11px;font-weight:500;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.brand}</div>
-            ${r.desc ? `<div style="font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.desc}</div>` : ''}
-          </div>
-        </div>`;
-      }).join('')}
-    </div>`;
-    if (html.includes('<h2>Key References</h2>')) {
-      html = html.replace('<h2>Key References</h2>', `<h2>Key References</h2>${refStrip}`);
-    } else {
-      html += `<h2>Key References</h2>${refStrip}`;
+  // Build reference strip
+  const refStrip = refs.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin:14px 0 20px">${
+    refs.map(r => {
+      if (!r) return '';
+      const hasImg = r.images && r.images[0];
+      return `<div onclick="openDetail('${r.id}')" style="cursor:pointer;border-radius:8px;overflow:hidden;border:1px solid var(--border)">
+        <div style="width:100%;aspect-ratio:1;background:var(--parchment);position:relative;overflow:hidden">
+          ${hasImg ? `<img src="${r.images[0]}" alt="${r.brand}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0" onerror="this.style.display='none'">` : ''}
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--muted);text-align:center;padding:6px;z-index:0">${r.brand}</div>
+        </div>
+        <div style="padding:5px 7px;background:#fff">
+          <div style="font-size:10px;font-weight:500;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.brand}</div>
+        </div>
+      </div>`;
+    }).join('')
+  }</div>` : '';
+
+  // Inject ref strip under Key References — try multiple heading variants
+  if (refStrip) {
+    const keyRefPatterns = ['<h2>Key References</h2>', '<h2>References</h2>', '<h2>Key References & Insights</h2>'];
+    let injected = false;
+    for (const pattern of keyRefPatterns) {
+      if (html.includes(pattern)) {
+        html = html.replace(pattern, `${pattern}${refStrip}`);
+        injected = true;
+        break;
+      }
+    }
+    if (!injected) {
+      // Try regex for any "reference" heading
+      const refHeadingRegex = /<h2>[^<]*[Rr]eference[^<]*<\/h2>/;
+      if (refHeadingRegex.test(html)) {
+        html = html.replace(refHeadingRegex, m => `${m}${refStrip}`);
+      } else {
+        html += `<h2>Key References</h2>${refStrip}`;
+      }
     }
   }
 
