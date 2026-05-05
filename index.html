@@ -2329,6 +2329,8 @@ function renderBriefContent(name, text, refs) {
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/^- (.+)$/gm, '<li>$1</li>')
     .replace(/(<li>.*<\/li>\n?)+/gs, m => `<ul>${m}</ul>`)
+    // Split on lines that start with a bold label (e.g. **Brand:**)
+    .replace(/\n(<strong>[^<]+<\/strong>)/g, '</p><p>$1')
     .split('\n\n')
     .map(block => {
       if (block.startsWith('<h') || block.startsWith('<ul') || block.startsWith('<li')) return block;
