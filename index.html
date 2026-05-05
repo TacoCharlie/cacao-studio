@@ -2351,25 +2351,20 @@ function renderBriefContent(name, text, refs) {
     html = html.replace('<h2>Colour Palette</h2>', `<h2>Colour Palette</h2>${paletteHTML}`);
   }
 
-  // Inject inline reference thumbnails — find first mention of each reference brand
-  const usedRefs = new Set();
-  refs.forEach(ref => {
-    if (!ref || !ref.images || !ref.images[0]) return;
-    // Build list of name variants to match (brand, first word of brand, etc.)
-    const brandWords = (ref.brand || '').split(/[\s,&+×]/)[0].trim();
-    if (!brandWords || brandWords.length < 3) return;
-    if (usedRefs.has(ref.id)) return;
-
-    // Escape for regex
-    const escaped = brandWords.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(`(${escaped}[^<]{0,30})`, 'i');
-    if (regex.test(html)) {
-      html = html.replace(regex, (match) => {
-        usedRefs.add(ref.id);
-        return `${match}<span style="display:inline-block;vertical-align:middle;margin:0 4px"><img src="${ref.images[0]}" alt="${ref.brand}" onclick="openDetail('${ref.id}')" style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid rgba(0,0,0,0.1);vertical-align:middle;cursor:pointer" title="Click to view ${ref.brand}${ref.desc ? ' — '+ref.desc : ''} in catalogue"></span>`;
-      });
-    }
-  });
+  // Inject reference image strip under Key References heading
+  if (refs.length) {
+    const refStrip = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin:14px 0 20px">
+      ${refs.filter(r => r && r.images && r.images[0]).map(r => `
+        <div onclick="openDetail('${r.id}')" style="cursor:pointer;border-radius:8px;overflow:hidden;border:1px solid var(--border);transition:transform .15s" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
+          <img src="${r.images[0]}" alt="${r.brand}" style="width:100%;aspect-ratio:1;object-fit:cover;display:block">
+          <div style="padding:6px 8px;background:#fff">
+            <div style="font-size:11px;font-weight:500;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.brand}</div>
+            ${r.desc ? `<div style="font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.desc}</div>` : ''}
+          </div>
+        </div>`).join('')}
+    </div>`;
+    html = html.replace('<h2>Key References</h2>', `<h2>Key References</h2>${refStrip}`);
+  }
 
   const briefId = currentBriefId;
   document.getElementById('brief-detail-content').innerHTML = `
