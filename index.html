@@ -2354,16 +2354,26 @@ function renderBriefContent(name, text, refs) {
   // Inject reference image strip under Key References heading
   if (refs.length) {
     const refStrip = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin:14px 0 20px">
-      ${refs.filter(r => r && r.images && r.images[0]).map(r => `
-        <div onclick="openDetail('${r.id}')" style="cursor:pointer;border-radius:8px;overflow:hidden;border:1px solid var(--border);transition:transform .15s" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
-          <img src="${r.images[0]}" alt="${r.brand}" style="width:100%;aspect-ratio:1;object-fit:cover;display:block">
+      ${refs.map(r => {
+        if (!r) return '';
+        const hasImg = r.images && r.images[0];
+        return `<div onclick="openDetail('${r.id}')" style="cursor:pointer;border-radius:8px;overflow:hidden;border:1px solid var(--border);transition:transform .15s" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
+          ${hasImg
+            ? `<img src="${r.images[0]}" alt="${r.brand}" style="width:100%;aspect-ratio:1;object-fit:cover;display:block" onerror="this.parentElement.querySelector('.ref-placeholder').style.display='flex';this.style.display='none'">`
+            : ''}
+          <div class="ref-placeholder" style="width:100%;aspect-ratio:1;background:var(--parchment);display:${hasImg?'none':'flex'};align-items:center;justify-content:center;font-family:var(--serif);font-size:11px;color:var(--muted);text-align:center;padding:8px">${r.brand}</div>
           <div style="padding:6px 8px;background:#fff">
             <div style="font-size:11px;font-weight:500;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.brand}</div>
             ${r.desc ? `<div style="font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.desc}</div>` : ''}
           </div>
-        </div>`).join('')}
+        </div>`;
+      }).join('')}
     </div>`;
-    html = html.replace('<h2>Key References</h2>', `<h2>Key References</h2>${refStrip}`);
+    if (html.includes('<h2>Key References</h2>')) {
+      html = html.replace('<h2>Key References</h2>', `<h2>Key References</h2>${refStrip}`);
+    } else {
+      html += `<h2>Key References</h2>${refStrip}`;
+    }
   }
 
   const briefId = currentBriefId;
