@@ -2249,6 +2249,19 @@ Structure your response with these exact section headings:
 ## Specific Directions
 ## What to Avoid
 
+At the end of the ## Colour Palette section, after all descriptive text, include a JSON block with exactly 4-6 definitive colours. Format it exactly like this (replace with your actual colours):
+
+\`\`\`palette
+{
+  "palette": [
+    {"hex": "#304830", "name": "Primary Background", "use": "Main exterior surface colour"},
+    {"hex": "#C9963E", "name": "Foil Accent", "use": "Wordmark and foil treatment only"},
+    {"hex": "#F0F0D8", "name": "Interior Panel", "use": "Inner reveal surface"},
+    {"hex": "#303030", "name": "Typography", "use": "All body text and fine print"}
+  ]
+}
+\`\`\`
+
 Be concrete, opinionated, and specific. Reference actual elements from the catalogue where relevant. The brief should feel like it was written by someone who deeply understands both the brand and the references.`;
 
   try {
@@ -2292,13 +2305,25 @@ Be concrete, opinionated, and specific. Reference actual elements from the catal
 }
 
 function renderBriefContent(name, text, refs) {
-  // First inject colour swatches into raw text (before HTML conversion)
-  let processed = text.replace(/#([0-9a-fA-F]{6})\b/g, (match, hex) =>
+  // Extract palette JSON block before any other processing
+  let paletteHTML = '';
+  let processedText = text.replace(/```palette\s*([\s\S]*?)```/g, (match, json) => {
+    try {
+      const data = JSON.parse(json.trim());
+      if (data.palette && data.palette.length) {
+        paletteHTML = renderPaletteStrip(data.palette);
+      }
+    } catch(e) {}
+    return ''; // Remove from text
+  });
+
+  // Inject colour swatches into raw text before HTML conversion
+  processedText = processedText.replace(/#([0-9a-fA-F]{6})\b/g, (match, hex) =>
     `SWATCH_${hex}_SWATCH${match}`
   );
 
-  // Convert markdown to HTML with better spacing
-  let html = processed
+  // Convert markdown to HTML
+  let html = processedText
     .replace(/^## (.+)$/gm, '<h2>$1</h2>')
     .replace(/^### (.+)$/gm, '<h3>$1</h3>')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
@@ -2313,13 +2338,17 @@ function renderBriefContent(name, text, refs) {
     .join('\n')
     .trim();
 
-  // Now safely replace swatch placeholders with HTML (no risk of regex re-matching)
-  html = html.replace(/SWATCH_([0-9a-fA-F]{6})_SWATCH(#[0-9a-fA-F]{6})/g, (match, hex, original) =>
+  // Replace swatch placeholders
+  html = html.replace(/SWATCH_([0-9a-fA-F]{6})_SWATCH(#[0-9a-fA-F]{6})/g, (match, hex) =>
     `<span style="display:inline-flex;align-items:center;gap:4px;vertical-align:middle"><span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#${hex};border:1px solid rgba(0,0,0,0.1);flex-shrink:0"></span><code style="font-size:11px;color:var(--muted)">#${hex}</code></span>`
   );
 
-  const briefId = currentBriefId;
+  // Inject palette strip after the Colour Palette heading
+  if (paletteHTML) {
+    html = html.replace('<h2>Colour Palette</h2>', `<h2>Colour Palette</h2>${paletteHTML}`);
+  }
 
+  const briefId = currentBriefId;
   document.getElementById('brief-detail-content').innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border)">
       <div>
@@ -2329,11 +2358,64 @@ function renderBriefContent(name, text, refs) {
       <div style="display:flex;gap:8px;flex-shrink:0">
         <button class="btn-ghost" onclick="saveBriefEdits('${briefId}')" style="font-size:11px">Save edits</button>
         <button class="btn-ghost" onclick="printBrief('${name}')" style="font-size:11px">Print</button>
-        <button class="btn-ghost" onclick="saveBriefAsPDF('${name}')" style="font-size:11px">Save PDF</button>
+        <button class="btn-ghost" onclick="downloadPalette('${briefId}')" style="font-size:11px">Palette PDF</button>
       </div>
     </div>
     <div class="brief-content" id="brief-editable" contenteditable="true" style="outline:none;min-height:200px">${html}</div>
   `;
+}
+
+function renderPaletteStrip(palette) {
+  return `<div style="display:grid;grid-template-columns:repeat(${palette.length},1fr);gap:10px;margin:16px 0 20px;padding:16px;background:var(--cream);border-radius:var(--radius)" id="palette-strip" data-palette='${JSON.stringify(palette)}'>
+    ${palette.map(c => `
+      <div style="text-align:center">
+        <div style="width:100%;aspect-ratio:1;border-radius:8px;background:${c.hex};margin-bottom:8px;border:1px solid rgba(0,0,0,0.08)"></div>
+        <div style="font-size:11px;font-weight:500;color:var(--ink);margin-bottom:2px">${c.name}</div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:2px">${c.use}</div>
+        <code style="font-size:10px;color:var(--muted)">${c.hex}</code>
+      </div>`).join('')}
+  </div>`;
+}
+
+function downloadPalette(briefId) {
+  const strip = document.getElementById('palette-strip');
+  if (!strip) { showToast('No palette found — regenerate the brief to get a structured palette'); return; }
+  const palette = JSON.parse(strip.dataset.palette || '[]');
+  if (!palette.length) return;
+  const b = briefsData.find(x => x.id === briefId);
+  const name = b ? b.name : 'Palette';
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head>
+    <title>${name} — Colour Palette</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Libre+Franklin:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+      body { font-family: 'Libre Franklin', sans-serif; margin: 40px; background: #F7F2EC; color: #1C1510; }
+      h1 { font-family: 'Cormorant Garamond', serif; font-size: 24px; font-weight: 300; font-style: italic; margin-bottom: 4px; }
+      .subtitle { font-size: 11px; color: #7A6E64; margin-bottom: 32px; letter-spacing: 0.06em; text-transform: uppercase; }
+      .swatches { display: grid; grid-template-columns: repeat(${palette.length}, 1fr); gap: 16px; }
+      .swatch-wrap { text-align: center; }
+      .swatch { width: 100%; aspect-ratio: 1; border-radius: 10px; margin-bottom: 10px; border: 1px solid rgba(0,0,0,0.08); }
+      .swatch-name { font-size: 12px; font-weight: 500; margin-bottom: 3px; }
+      .swatch-use { font-size: 10px; color: #7A6E64; margin-bottom: 4px; line-height: 1.4; }
+      .swatch-hex { font-family: monospace; font-size: 11px; color: #7A6E64; }
+      @media print { body { margin: 20px; background: white; } }
+    </style>
+  </head><body>
+    <h1>${name}</h1>
+    <div class="subtitle">Colour Palette · Evoke Chocolate</div>
+    <div class="swatches">
+      ${palette.map(c => `
+        <div class="swatch-wrap">
+          <div class="swatch" style="background:${c.hex}"></div>
+          <div class="swatch-name">${c.name}</div>
+          <div class="swatch-use">${c.use}</div>
+          <div class="swatch-hex">${c.hex}</div>
+        </div>`).join('')}
+    </div>
+  </body></html>`);
+  win.document.close();
+  win.focus();
+  setTimeout(() => { win.print(); }, 500);
 }
 
 function printBrief(name) {
@@ -2361,11 +2443,6 @@ function printBrief(name) {
   setTimeout(() => { win.print(); }, 500);
 }
 
-function saveBriefAsPDF(name) {
-  // Use print dialog with PDF destination
-  printBrief(name);
-  showToast('In the print dialog, choose "Save as PDF" as the destination');
-}
 
 function openBriefDetail(id) {
   const b = briefsData.find(x => x.id === id); if (!b) return;
@@ -2486,7 +2563,18 @@ Rewrite the complete packaging brief incorporating this feedback. Keep what was 
 ## Tone & Mood
 ## Key References
 ## Specific Directions
-## What to Avoid`;
+## What to Avoid
+
+At the end of the ## Colour Palette section, include a JSON block with exactly 4-6 definitive colours:
+
+\`\`\`palette
+{
+  "palette": [
+    {"hex": "#304830", "name": "Primary Background", "use": "Main exterior surface colour"},
+    {"hex": "#C9963E", "name": "Foil Accent", "use": "Wordmark and foil treatment only"}
+  ]
+}
+\`\`\``;
 
   try {
     const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-brief`, {
