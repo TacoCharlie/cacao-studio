@@ -2308,17 +2308,34 @@ Be concrete, opinionated, and specific. Reference actual elements from the catal
 function renderBriefContent(name, text, refs) {
   if (!text) { document.getElementById('brief-detail-content').innerHTML = '<p style="color:var(--muted)">No content.</p>'; return; }
 
-  // Step 1: Extract palette block — remove it from text entirely
+  console.log('=== RAW BRIEF TEXT ===');
+  console.log(text);
+  console.log('=== END RAW TEXT ===');
+
+  // Step 1: Extract palette block — try every possible format
   let paletteData = null;
-  let cleanText = text.replace(/`{3}palette([\s\S]*?)`{3}/g, (match, inner) => {
-    try { const d = JSON.parse(inner.trim()); if (d.palette) paletteData = d.palette; } catch(e) {}
-    return '';
-  });
-  // Also try ```json blocks that contain a palette key
-  cleanText = cleanText.replace(/`{3}json([\s\S]*?)`{3}/g, (match, inner) => {
-    try { const d = JSON.parse(inner.trim()); if (d.palette) { paletteData = d.palette; return ''; } } catch(e) {}
-    return match;
-  });
+  let cleanText = text
+
+    // ```palette ... ```
+    .replace(/`{3}palette\s*([\s\S]*?)`{3}/g, (match, inner) => {
+      try { const d = JSON.parse(inner.trim()); if (d.palette) paletteData = d.palette; } catch(e) { console.log('palette parse error:', e.message, inner.slice(0,100)); }
+      return '';
+    })
+    // ```json ... ``` containing palette key
+    .replace(/`{3}json\s*([\s\S]*?)`{3}/g, (match, inner) => {
+      try { const d = JSON.parse(inner.trim()); if (d.palette) { paletteData = d.palette; return ''; } } catch(e) {}
+      return match;
+    });
+
+  // If still no palette, try finding raw JSON object with palette key anywhere in text
+  if (!paletteData) {
+    const jsonMatch = cleanText.match(/\{[\s\S]*?"palette"\s*:\s*\[[\s\S]*?\]\s*\}/);
+    if (jsonMatch) {
+      try { const d = JSON.parse(jsonMatch[0]); if (d.palette) { paletteData = d.palette; cleanText = cleanText.replace(jsonMatch[0], ''); } } catch(e) {}
+    }
+  }
+
+  console.log('Palette found:', paletteData ? paletteData.length + ' colours' : 'none');
 
   // Step 2: Mark hex codes before any HTML conversion
   cleanText = cleanText.replace(/#([0-9a-fA-F]{6})\b/g, '◈$1◈');
