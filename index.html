@@ -894,21 +894,32 @@ input[type="file"] { display: none; }
     <div class="modal-subtitle">Select sections to export as CSV files</div>
     <div style="margin:16px 0;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
       <label style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--parchment);border-bottom:1px solid var(--border);cursor:pointer;font-size:12px;font-weight:500">
-        <input type="checkbox" id="export-all-check" onchange="toggleExportAll(this)" style="accent-color:var(--ink)"> Select all
+        <input type="checkbox" id="export-all-check" onchange="toggleExportAll(this)" style="accent-color:var(--ink)" checked> Select all
       </label>
-      ${[
-        ['export-packaging','Packaging Catalogue'],
-        ['export-brand','Brand Foundation'],
-        ['export-briefs','Briefs'],
-        ['export-lab','Lab Experiments'],
-        ['export-products','Production Ready Products'],
-        ['export-resellers','Resellers'],
-        ['export-festivals','Chocolate Festivals'],
-        ['export-markets','Markets']
-      ].map(([id,label]) => `
       <label style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer;font-size:12px" class="export-row">
-        <input type="checkbox" id="${id}" checked style="accent-color:var(--ink)"> ${label}
-      </label>`).join('')}
+        <input type="checkbox" id="export-packaging" checked style="accent-color:var(--ink)"> Packaging Catalogue
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer;font-size:12px" class="export-row">
+        <input type="checkbox" id="export-brand" checked style="accent-color:var(--ink)"> Brand Foundation
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer;font-size:12px" class="export-row">
+        <input type="checkbox" id="export-briefs" checked style="accent-color:var(--ink)"> Briefs
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer;font-size:12px" class="export-row">
+        <input type="checkbox" id="export-lab" checked style="accent-color:var(--ink)"> Lab Experiments
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer;font-size:12px" class="export-row">
+        <input type="checkbox" id="export-products" checked style="accent-color:var(--ink)"> Production Ready Products
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer;font-size:12px" class="export-row">
+        <input type="checkbox" id="export-resellers" checked style="accent-color:var(--ink)"> Resellers
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer;font-size:12px" class="export-row">
+        <input type="checkbox" id="export-festivals" checked style="accent-color:var(--ink)"> Chocolate Festivals
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;font-size:12px" class="export-row">
+        <input type="checkbox" id="export-markets" checked style="accent-color:var(--ink)"> Markets
+      </label>
     </div>
     <button class="submit-btn" onclick="runExport()">Download selected</button>
   </div>
