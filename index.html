@@ -2306,91 +2306,75 @@ Be concrete, opinionated, and specific. Reference actual elements from the catal
 }
 
 function renderBriefContent(name, text, refs) {
-  // Extract palette JSON block — handle various formats Claude might use
-  let paletteHTML = '';
-  let processedText = text
-    .replace(/```palette\s*([\s\S]*?)```/g, (match, json) => {
-      try { const d = JSON.parse(json.trim()); if (d.palette) paletteHTML = renderPaletteStrip(d.palette); } catch(e) {}
-      return '';
-    })
-    .replace(/```json\s*([\s\S]*?)```/g, (match, json) => {
-      try { const d = JSON.parse(json.trim()); if (d.palette) { paletteHTML = renderPaletteStrip(d.palette); return ''; } } catch(e) {}
-      return match; // keep if not a palette block
-    });
+  if (!text) { document.getElementById('brief-detail-content').innerHTML = '<p style="color:var(--muted)">No content.</p>'; return; }
 
-  // Inject colour swatches into raw text before HTML conversion
-  processedText = processedText.replace(/#([0-9a-fA-F]{6})\b/g, (match, hex) =>
-    `SWATCH_${hex}_SWATCH${match}`
-  );
+  // Step 1: Extract palette block — remove it from text entirely
+  let paletteData = null;
+  let cleanText = text.replace(/`{3}palette([\s\S]*?)`{3}/g, (match, inner) => {
+    try { const d = JSON.parse(inner.trim()); if (d.palette) paletteData = d.palette; } catch(e) {}
+    return '';
+  });
+  // Also try ```json blocks that contain a palette key
+  cleanText = cleanText.replace(/`{3}json([\s\S]*?)`{3}/g, (match, inner) => {
+    try { const d = JSON.parse(inner.trim()); if (d.palette) { paletteData = d.palette; return ''; } } catch(e) {}
+    return match;
+  });
 
-  // Convert markdown to HTML
-  let html = processedText
+  // Step 2: Mark hex codes before any HTML conversion
+  cleanText = cleanText.replace(/#([0-9a-fA-F]{6})\b/g, '◈$1◈');
+
+  // Step 3: Convert markdown to HTML
+  let html = cleanText
     .replace(/^## (.+)$/gm, '<h2>$1</h2>')
     .replace(/^### (.+)$/gm, '<h3>$1</h3>')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/^- (.+)$/gm, '<li>$1</li>')
-    .replace(/(<li>.*<\/li>\n?)+/gs, m => `<ul>${m}</ul>`)
-    .replace(/\n(<strong>[^<]+<\/strong>)/g, '</p><p>$1')
-    .split('\n\n')
+    .replace(/^[-*] (.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>[\s\S]*?<\/li>)(\n<li>[\s\S]*?<\/li>)*/g, m => `<ul>${m}</ul>`)
+    .replace(/\n(<strong>[^<]+:<\/strong>)/g, '</p><p>$1')
+    .split(/\n{2,}/)
     .map(block => {
-      if (block.startsWith('<h') || block.startsWith('<ul') || block.startsWith('<li')) return block;
-      if (block.trim()) return `<p>${block.trim()}</p>`;
-      return '';
+      block = block.trim();
+      if (!block) return '';
+      if (/^<(h[23]|ul|li)/.test(block)) return block;
+      return `<p>${block}</p>`;
     })
-    .join('\n')
-    .trim();
+    .filter(Boolean)
+    .join('\n');
 
-  // Replace swatch placeholders
-  html = html.replace(/SWATCH_([0-9a-fA-F]{6})_SWATCH(#[0-9a-fA-F]{6})/g, (match, hex) =>
-    `<span style="display:inline-flex;align-items:center;gap:4px;vertical-align:middle"><span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#${hex};border:1px solid rgba(0,0,0,0.1);flex-shrink:0"></span><code style="font-size:11px;color:var(--muted)">#${hex}</code></span>`
+  // Step 4: Replace hex markers with swatches
+  html = html.replace(/◈([0-9a-fA-F]{6})◈/g, (_, hex) =>
+    `<span style="display:inline-flex;align-items:center;gap:3px;vertical-align:middle"><span style="display:inline-block;width:13px;height:13px;border-radius:3px;background:#${hex};border:1px solid rgba(0,0,0,0.12);flex-shrink:0"></span><code style="font-size:11px;color:var(--muted)">#${hex}</code></span>`
   );
 
-  // Inject palette strip after Colour Palette heading
-  if (paletteHTML) {
-    if (html.includes('<h2>Colour Palette</h2>')) {
-      html = html.replace('<h2>Colour Palette</h2>', `<h2>Colour Palette</h2>${paletteHTML}`);
-    } else {
-      // find any colour palette-like heading
-      html = html.replace(/<h2>([^<]*[Cc]olou?r[^<]*)<\/h2>/, `<h2>$1</h2>${paletteHTML}`);
-    }
+  // Step 5: Inject palette swatch strip after Colour Palette heading
+  if (paletteData) {
+    const strip = renderPaletteStrip(paletteData);
+    html = html.replace(/<h2>([^<]*[Cc]olou?r[^<]*Palette[^<]*)<\/h2>/, `<h2>$1</h2>${strip}`)
+           || (html = html.replace(/<h2>([^<]*[Cc]olou?r[^<]*)<\/h2>/, `<h2>$1</h2>${strip}`));
   }
 
-  // Build reference strip
-  const refStrip = refs.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin:14px 0 20px">${
-    refs.map(r => {
-      if (!r) return '';
-      const hasImg = r.images && r.images[0];
-      return `<div onclick="openDetail('${r.id}')" style="cursor:pointer;border-radius:8px;overflow:hidden;border:1px solid var(--border)">
-        <div style="width:100%;aspect-ratio:1;background:var(--parchment);position:relative;overflow:hidden">
-          ${hasImg ? `<img src="${r.images[0]}" alt="${r.brand}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0" onerror="this.style.display='none'">` : ''}
-          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--muted);text-align:center;padding:6px;z-index:0">${r.brand}</div>
-        </div>
-        <div style="padding:5px 7px;background:#fff">
-          <div style="font-size:10px;font-weight:500;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.brand}</div>
-        </div>
-      </div>`;
-    }).join('')
-  }</div>` : '';
-
-  // Inject ref strip under Key References — try multiple heading variants
-  if (refStrip) {
-    const keyRefPatterns = ['<h2>Key References</h2>', '<h2>References</h2>', '<h2>Key References & Insights</h2>'];
-    let injected = false;
-    for (const pattern of keyRefPatterns) {
-      if (html.includes(pattern)) {
-        html = html.replace(pattern, `${pattern}${refStrip}`);
-        injected = true;
-        break;
-      }
-    }
-    if (!injected) {
-      // Try regex for any "reference" heading
-      const refHeadingRegex = /<h2>[^<]*[Rr]eference[^<]*<\/h2>/;
-      if (refHeadingRegex.test(html)) {
-        html = html.replace(refHeadingRegex, m => `${m}${refStrip}`);
-      } else {
-        html += `<h2>Key References</h2>${refStrip}`;
-      }
+  // Step 6: Build reference strip
+  const validRefs = refs.filter(Boolean);
+  if (validRefs.length) {
+    const strip = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin:12px 0 18px">${
+      validRefs.map(r => {
+        const img = r.images && r.images[0]
+          ? `<img src="${r.images[0]}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0" onerror="this.style.display='none'">`
+          : '';
+        return `<div onclick="openDetail('${r.id}')" style="cursor:pointer;border-radius:8px;overflow:hidden;border:1px solid var(--border)">
+          <div style="aspect-ratio:1;background:var(--parchment);position:relative">${img}
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--muted);text-align:center;padding:4px">${r.brand}</div>
+          </div>
+          <div style="padding:4px 6px;background:#fff;font-size:10px;font-weight:500;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.brand}</div>
+        </div>`;
+      }).join('')
+    }</div>`;
+    // Try to inject after Key References heading
+    const refPattern = /<h2>[^<]*(?:[Kk]ey\s+)?[Rr]eference[^<]*<\/h2>/;
+    if (refPattern.test(html)) {
+      html = html.replace(refPattern, m => m + strip);
+    } else {
+      html += `<h2>Key References</h2>${strip}`;
     }
   }
 
@@ -2399,7 +2383,7 @@ function renderBriefContent(name, text, refs) {
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border)">
       <div>
         <div style="font-family:var(--serif);font-size:24px;font-weight:300;font-style:italic">${name}</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:4px">${refs.length} catalogue references · Click text to edit</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">${validRefs.length} catalogue references · Click text to edit</div>
       </div>
       <div style="display:flex;gap:8px;flex-shrink:0">
         <button class="btn-ghost" onclick="saveBriefEdits('${briefId}')" style="font-size:11px">Save edits</button>
@@ -2407,8 +2391,7 @@ function renderBriefContent(name, text, refs) {
         <button class="btn-ghost" onclick="downloadPalette('${briefId}')" style="font-size:11px">Palette PDF</button>
       </div>
     </div>
-    <div class="brief-content" id="brief-editable" contenteditable="true" style="outline:none;min-height:200px">${html}</div>
-  `;
+    <div class="brief-content" id="brief-editable" contenteditable="true" style="outline:none;min-height:200px">${html}</div>`;
 }
 
 function renderPaletteStrip(palette) {
