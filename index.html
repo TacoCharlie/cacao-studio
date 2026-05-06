@@ -386,6 +386,28 @@ input[type="file"] { display: none; }
 .compare-cogs-row td { font-family: var(--serif); font-size: 14px; font-weight: 600; color: var(--cocoa); background: var(--parchment); }
 .compare-outcome { font-size: 11px; color: var(--muted); font-style: italic; text-align: center; line-height: 1.5; padding: 8px; }
 
+/* ── OUTREACH ───────────────────────────────────────────── */
+.outreach-list { display: flex; flex-direction: column; gap: 10px; }
+.outreach-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px 18px; transition: all var(--t); }
+.outreach-card.status-active { border-left: 4px solid #27500A; }
+.outreach-card.status-committed { border-left: 4px solid #1A56DB; }
+.outreach-card-head { display: flex; align-items: flex-start; gap: 12px; }
+.outreach-card-info { flex: 1; }
+.outreach-card-name { font-family: var(--serif); font-size: 16px; font-weight: 400; margin-bottom: 3px; }
+.outreach-card-meta { font-size: 11px; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.outreach-card-actions { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
+.outreach-action-btn { padding: 4px 10px; border: 1px solid var(--border-md); border-radius: 6px; font-size: 11px; color: var(--muted); transition: all var(--t); }
+.outreach-action-btn:hover { background: var(--parchment); color: var(--cocoa); border-color: var(--cocoa); }
+.outreach-card-notes { font-size: 12px; color: var(--muted); margin-top: 10px; line-height: 1.6; border-top: 1px solid var(--border); padding-top: 10px; }
+.outreach-tags { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
+.outreach-tag { padding: 2px 8px; border-radius: 4px; background: var(--parchment); font-size: 10px; color: var(--muted); }
+.followup-badge { padding: 2px 8px; border-radius: 4px; background: #FDF3E0; color: #7A4E0A; font-size: 10px; }
+.followup-badge.overdue { background: #FDE8E8; color: #9B1C1C; }
+.diary-entry { padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; }
+.diary-entry-date { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 6px; }
+.diary-entry-content { font-size: 13px; color: var(--ink); line-height: 1.7; }
+.diary-followup { margin-top: 8px; padding: 6px 10px; background: #FDF3E0; border-radius: 4px; font-size: 11px; color: #7A4E0A; }
+
 /* ── DESIGN DIRECTION ───────────────────────────────────── */
 .dir-section-label { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
 .dir-section-title { font-family: var(--serif); font-size: 20px; font-weight: 300; font-style: italic; display: block; }
@@ -457,6 +479,14 @@ input[type="file"] { display: none; }
         <div class="nav-dropdown-menu" id="dd-products">
           <button class="nav-dropdown-item" onclick="showPage('production',this);closeDropdowns()">Production Ready</button>
           <button class="nav-dropdown-item" onclick="showPage('lab',this);closeDropdowns()">Lab</button>
+        </div>
+      </div>
+      <div class="nav-dropdown">
+        <button class="nav-tab" onclick="toggleDropdown('dd-outreach')">Outreach ▾</button>
+        <div class="nav-dropdown-menu" id="dd-outreach">
+          <button class="nav-dropdown-item" onclick="showPage('resellers',this);closeDropdowns()">Resellers</button>
+          <button class="nav-dropdown-item" onclick="showPage('festivals',this);closeDropdowns()">Chocolate Festivals</button>
+          <button class="nav-dropdown-item" onclick="showPage('markets',this);closeDropdowns()">Markets</button>
         </div>
       </div>
     </div>
@@ -578,6 +608,107 @@ input[type="file"] { display: none; }
       <button class="filter-chip" onclick="setLabFilter(this,'Abandoned')">Abandoned</button>
     </div>
     <div class="lab-list" id="lab-list"></div>
+  </div>
+
+  <!-- RESELLERS PAGE -->
+  <div class="page" id="page-resellers">
+    <div class="page-head">
+      <div><div class="page-head-title">Resellers</div><div class="page-head-sub">Potential and active retail partners</div></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-ghost" onclick="exportOutreach('resellers')" style="font-size:12px">Export CSV</button>
+        <button class="btn-primary" onclick="openOutreachModal('resellers')">+ Add Reseller</button>
+      </div>
+    </div>
+    <div class="filter-row">
+      <input class="search-input" id="resellers-search" placeholder="Search resellers…" oninput="applyOutreachFilters('resellers')">
+      <button class="filter-chip active" onclick="setOutreachFilter('resellers',this,'all')">All</button>
+      <button class="filter-chip" onclick="setOutreachFilter('resellers',this,'active')" style="border-color:#27500A;color:#27500A">Active only</button>
+    </div>
+    <div class="outreach-list" id="resellers-list"></div>
+  </div>
+
+  <!-- FESTIVALS PAGE -->
+  <div class="page" id="page-festivals">
+    <div class="page-head">
+      <div><div class="page-head-title">Chocolate Festivals</div><div class="page-head-sub">Worldwide festivals and shows</div></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-ghost" onclick="exportOutreach('festivals')" style="font-size:12px">Export CSV</button>
+        <button class="btn-primary" onclick="openOutreachModal('festivals')">+ Add Festival</button>
+      </div>
+    </div>
+    <div class="filter-row">
+      <input class="search-input" id="festivals-search" placeholder="Search festivals…" oninput="applyOutreachFilters('festivals')">
+      <button class="filter-chip active" onclick="setOutreachFilter('festivals',this,'all')">All</button>
+      <button class="filter-chip" onclick="setOutreachFilter('festivals',this,'active')" style="border-color:#1A56DB;color:#1A56DB">Committed only</button>
+    </div>
+    <div class="outreach-list" id="festivals-list"></div>
+  </div>
+
+  <!-- MARKETS PAGE -->
+  <div class="page" id="page-markets">
+    <div class="page-head">
+      <div><div class="page-head-title">Markets</div><div class="page-head-sub">Farmers markets and vendor opportunities</div></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-ghost" onclick="exportOutreach('markets')" style="font-size:12px">Export CSV</button>
+        <button class="btn-primary" onclick="openOutreachModal('markets')">+ Add Market</button>
+      </div>
+    </div>
+    <div class="filter-row">
+      <input class="search-input" id="markets-search" placeholder="Search markets…" oninput="applyOutreachFilters('markets')">
+      <button class="filter-chip active" onclick="setOutreachFilter('markets',this,'all')">All</button>
+      <button class="filter-chip" onclick="setOutreachFilter('markets',this,'active')" style="border-color:#27500A;color:#27500A">Active only</button>
+    </div>
+    <div class="outreach-list" id="markets-list"></div>
+  </div>
+</div>
+
+<!-- OUTREACH ADD/EDIT MODAL -->
+<div class="modal-overlay" id="modal-outreach" onclick="if(event.target===this)closeOutreachModal()">
+  <div class="modal" style="width:min(640px,94vw)" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title" id="outreach-modal-title">Add Reseller</div>
+      <button class="modal-x" onclick="closeOutreachModal()">✕</button>
+    </div>
+    <div id="outreach-modal-fields"></div>
+    <input type="hidden" id="outreach-modal-type" value="">
+    <input type="hidden" id="outreach-modal-editing-id" value="">
+    <button class="submit-btn" id="outreach-submit-btn" onclick="saveOutreach()">Save</button>
+  </div>
+</div>
+
+<!-- DIARY MODAL -->
+<div class="modal-overlay" id="modal-diary" onclick="if(event.target===this)closeDiaryModal()">
+  <div class="modal" style="width:min(680px,94vw)" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title" id="diary-modal-title">Diary</div>
+      <button class="modal-x" onclick="closeDiaryModal()">✕</button>
+    </div>
+    <div class="modal-subtitle" id="diary-modal-subtitle"></div>
+
+    <!-- New entry form -->
+    <div style="background:var(--parchment);border-radius:var(--radius);padding:16px;margin-bottom:20px">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:12px">New entry</div>
+      <div class="frow">
+        <div class="fg"><label class="fl">Date</label><input class="fi" type="date" id="diary-date"></div>
+        <div class="fg"><label class="fl">Follow-up date <span style="font-weight:300;font-size:10px;text-transform:none;letter-spacing:0">(optional)</span></label><input class="fi" type="date" id="diary-followup-date"></div>
+      </div>
+      <div class="fg"><label class="fl">Entry</label><textarea class="fta" id="diary-content" placeholder="What happened, who you met, what to remember…" style="min-height:80px"></textarea></div>
+      <div class="fg"><label class="fl">Follow-up note <span style="font-weight:300;font-size:10px;text-transform:none;letter-spacing:0">(optional)</span></label><input class="fi" id="diary-followup-note" placeholder="e.g. Send samples, follow up on pricing…"></div>
+      <div class="fg">
+        <label class="fl">Tags</label>
+        <div id="diary-tag-selector" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
+        <div style="display:flex;gap:8px">
+          <input class="fi" id="diary-new-tag" placeholder="Add custom tag…" style="flex:1" onkeydown="if(event.key==='Enter'){addDiaryTag();event.preventDefault()}">
+          <button class="add-custom-btn" onclick="addDiaryTag()">Add</button>
+        </div>
+      </div>
+      <button class="btn-primary" onclick="saveDiaryEntry()" style="margin-top:4px;font-size:12px;padding:8px 20px">Save entry</button>
+    </div>
+
+    <!-- Past entries -->
+    <div id="diary-entries-list"></div>
+    <input type="hidden" id="diary-record-type" value="">
+    <input type="hidden" id="diary-record-id" value="">
   </div>
 </div>
 
@@ -1186,7 +1317,7 @@ async function bootApp(user) {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   document.getElementById('nav-user-email').textContent = user.email;
-  await Promise.all([loadAllData(), loadLabData(), loadBriefs()]);
+  await Promise.all([loadAllData(), loadLabData(), loadBriefs(), loadOutreachData()]);
 }
 
 sb.auth.getSession().then(({ data }) => { if (data.session) bootApp(data.session.user); });
@@ -2132,6 +2263,388 @@ function setProdFilter(btn,f) {
 function applyProdFilters() {
   const q=document.getElementById('prod-search').value.toLowerCase();
   renderProducts(productData.filter(p=>(prodFilter==='all'||p.cat===prodFilter)&&(!q||[p.name,p.tagline].join(' ').toLowerCase().includes(q))));
+}
+
+/* ══════════════════════════════════════════════════════════
+   OUTREACH
+══════════════════════════════════════════════════════════ */
+const OUTREACH_TABLES = { resellers: 'outreach_resellers', festivals: 'outreach_festivals', markets: 'outreach_markets' };
+const OUTREACH_STATUSES = {
+  resellers: ['Prospect','Contacted','In discussion','Active','Passed'],
+  festivals: ['On radar','Applied','Accepted','Attended','Passed'],
+  markets: ['On radar','Applied','Accepted','Regular','Passed']
+};
+const OUTREACH_ACTIVE_STATUS = { resellers: 'Active', festivals: 'Accepted', markets: ['Accepted','Regular'] };
+
+let outreachData = { resellers: [], festivals: [], markets: [] };
+let outreachDiary = [];
+let outreachTags = [];
+let outreachFilters = { resellers: 'all', festivals: 'all', markets: 'all' };
+let currentDiaryTags = [];
+
+async function loadOutreachData() {
+  const [rRes, fRes, mRes, dRes, tRes] = await Promise.all([
+    sb.from('outreach_resellers').select('*').order('created_at', { ascending: false }),
+    sb.from('outreach_festivals').select('*').order('created_at', { ascending: false }),
+    sb.from('outreach_markets').select('*').order('created_at', { ascending: false }),
+    sb.from('outreach_diary').select('*').order('entry_date', { ascending: false }),
+    sb.from('outreach_tags').select('*').order('tag')
+  ]);
+  if (rRes.data) outreachData.resellers = rRes.data;
+  if (fRes.data) outreachData.festivals = fRes.data;
+  if (mRes.data) outreachData.markets = mRes.data;
+  if (dRes.data) outreachDiary = dRes.data;
+  if (tRes.data) outreachTags = tRes.data.map(t => t.tag);
+  renderOutreach('resellers');
+  renderOutreach('festivals');
+  renderOutreach('markets');
+}
+
+function getStatusClass(type, status) {
+  const active = OUTREACH_ACTIVE_STATUS[type];
+  if (Array.isArray(active) ? active.includes(status) : status === active) {
+    return type === 'festivals' ? 'status-committed' : 'status-active';
+  }
+  return '';
+}
+
+function renderOutreach(type) {
+  const list = document.getElementById(type+'-list');
+  if (!list) return;
+  const filter = outreachFilters[type];
+  const q = document.getElementById(type+'-search')?.value.toLowerCase() || '';
+  const active = OUTREACH_ACTIVE_STATUS[type];
+  let data = outreachData[type].filter(r => {
+    if (filter === 'active') {
+      return Array.isArray(active) ? active.includes(r.status) : r.status === active;
+    }
+    return true;
+  }).filter(r => !q || [r.name, r.location, r.notes, r.type, r.contact_name, r.contact].join(' ').toLowerCase().includes(q));
+
+  if (!data.length) {
+    list.innerHTML = `<div class="empty-state" style="grid-column:unset"><div class="empty-state-title">No ${type} yet</div></div>`;
+    return;
+  }
+
+  list.innerHTML = data.map(r => {
+    const diaryCount = outreachDiary.filter(d => d.record_id === r.id).length;
+    const tags = r.tags ? JSON.parse(r.tags) : [];
+    const statusClass = getStatusClass(type, r.status);
+    // Check for overdue follow-ups
+    const overdue = outreachDiary.filter(d => d.record_id === r.id && d.follow_up_date && new Date(d.follow_up_date) < new Date() && !d.follow_up_done);
+
+    // Build meta fields per type
+    let meta = `<span>${r.status}</span>`;
+    if (type === 'resellers') { if (r.location) meta += `<span>${r.location}</span>`; if (r.type) meta += `<span>${r.type}</span>`; }
+    if (type === 'festivals') { if (r.location) meta += `<span>${r.location}</span>`; if (r.dates) meta += `<span>${r.dates}</span>`; if (r.booth_cost) meta += `<span>Booth: ${r.booth_cost}</span>`; }
+    if (type === 'markets') { if (r.location) meta += `<span>${r.location}</span>`; if (r.frequency) meta += `<span>${r.frequency}</span>`; if (r.booth_cost) meta += `<span>Booth: ${r.booth_cost}</span>`; }
+    if (overdue.length) meta += `<span class="followup-badge overdue">⚑ Follow-up overdue</span>`;
+
+    return `<div class="outreach-card ${statusClass}">
+      <div class="outreach-card-head">
+        <div class="outreach-card-info">
+          <div class="outreach-card-name">${r.name}</div>
+          <div class="outreach-card-meta">${meta}</div>
+          ${tags.length ? `<div class="outreach-tags">${tags.map(t=>`<span class="outreach-tag">${t}</span>`).join('')}</div>` : ''}
+          ${r.notes ? `<div class="outreach-card-notes">${r.notes}</div>` : ''}
+        </div>
+        <div class="outreach-card-actions">
+          <select class="chip" onchange="quickUpdateOutreachStatus('${type}','${r.id}',this.value)" style="border:1px solid var(--border-md);cursor:pointer;font-size:11px;padding:3px 6px;border-radius:6px;appearance:none;background:var(--cream)">
+            ${OUTREACH_STATUSES[type].map(s=>`<option value="${s}" ${s===r.status?'selected':''}>${s}</option>`).join('')}
+          </select>
+          <button class="outreach-action-btn" onclick="openDiaryModal('${type}','${r.id}','${r.name.replace(/'/g,"\\'")}')">
+            Diary${diaryCount ? ` (${diaryCount})` : ''}
+          </button>
+          <button class="outreach-action-btn" onclick="openOutreachModal('${type}','${r.id}')">Edit</button>
+          <button class="outreach-action-btn" onclick="deleteOutreach('${type}','${r.id}')" style="color:rgba(200,80,60,0.7)">Del</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function setOutreachFilter(type, btn, filter) {
+  outreachFilters[type] = filter;
+  document.querySelectorAll(`#page-${type} .filter-chip`).forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderOutreach(type);
+}
+
+function applyOutreachFilters(type) { renderOutreach(type); }
+
+async function quickUpdateOutreachStatus(type, id, status) {
+  const table = OUTREACH_TABLES[type];
+  await sb.from(table).update({ status }).eq('id', id);
+  const rec = outreachData[type].find(r => r.id === id);
+  if (rec) rec.status = status;
+  renderOutreach(type);
+  showToast('Status updated ✦');
+}
+
+async function deleteOutreach(type, id) {
+  if (!confirm('Delete this record? This cannot be undone.')) return;
+  await sb.from(OUTREACH_TABLES[type]).delete().eq('id', id);
+  await sb.from('outreach_diary').delete().eq('record_id', id);
+  outreachData[type] = outreachData[type].filter(r => r.id !== id);
+  renderOutreach(type);
+  showToast('Deleted');
+}
+
+/* ── OUTREACH MODAL ─────────────────────────────── */
+const OUTREACH_FIELDS = {
+  resellers: [
+    { id:'name', label:'Name', required:true },
+    { id:'location', label:'Location (city, country)' },
+    { id:'type', label:'Type', type:'select', options:['Specialty food store','Gift shop','Online retailer','Hotel / hospitality','Restaurant / café','Other'] },
+    { id:'contact_name', label:'Contact name' },
+    { id:'email', label:'Email' },
+    { id:'website', label:'Website' },
+    { id:'status', label:'Status', type:'select', options:['Prospect','Contacted','In discussion','Active','Passed'] },
+    { id:'notes', label:'Notes', type:'textarea' },
+    { id:'tags', label:'Tags', type:'tags' }
+  ],
+  festivals: [
+    { id:'name', label:'Festival name', required:true },
+    { id:'location', label:'Location (city, country)' },
+    { id:'dates', label:'Dates' },
+    { id:'website', label:'Website' },
+    { id:'application_deadline', label:'Application deadline' },
+    { id:'booth_cost', label:'Booth cost' },
+    { id:'attendance_size', label:'Attendance size' },
+    { id:'status', label:'Status', type:'select', options:['On radar','Applied','Accepted','Attended','Passed'] },
+    { id:'notes', label:'Notes', type:'textarea' },
+    { id:'tags', label:'Tags', type:'tags' }
+  ],
+  markets: [
+    { id:'name', label:'Market name', required:true },
+    { id:'location', label:'Location' },
+    { id:'frequency', label:'Frequency', type:'select', options:['Weekly','Bi-weekly','Monthly','Seasonal','Annual','One-off'] },
+    { id:'dates', label:'Dates / schedule' },
+    { id:'website', label:'Website' },
+    { id:'contact', label:'Contact' },
+    { id:'booth_cost', label:'Booth cost' },
+    { id:'status', label:'Status', type:'select', options:['On radar','Applied','Accepted','Regular','Passed'] },
+    { id:'notes', label:'Notes', type:'textarea' },
+    { id:'tags', label:'Tags', type:'tags' }
+  ]
+};
+
+let currentOutreachTags = [];
+
+function openOutreachModal(type, editId) {
+  const rec = editId ? outreachData[type].find(r => r.id === editId) : null;
+  document.getElementById('outreach-modal-title').textContent = rec ? `Edit ${type === 'resellers' ? 'Reseller' : type === 'festivals' ? 'Festival' : 'Market'}` : `Add ${type === 'resellers' ? 'Reseller' : type === 'festivals' ? 'Festival' : 'Market'}`;
+  document.getElementById('outreach-modal-type').value = type;
+  document.getElementById('outreach-modal-editing-id').value = editId || '';
+  document.getElementById('outreach-submit-btn').textContent = rec ? 'Update' : 'Save';
+  currentOutreachTags = rec && rec.tags ? JSON.parse(rec.tags) : [];
+
+  const fields = OUTREACH_FIELDS[type];
+  document.getElementById('outreach-modal-fields').innerHTML = fields.map(f => {
+    const val = rec ? (rec[f.id] || '') : '';
+    if (f.type === 'select') {
+      return `<div class="fg"><label class="fl">${f.label}</label><select class="smart-select" id="of-${f.id}" style="padding:8px 12px">${f.options.map(o=>`<option ${o===val?'selected':''}>${o}</option>`).join('')}</select></div>`;
+    }
+    if (f.type === 'textarea') {
+      return `<div class="fg"><label class="fl">${f.label}</label><textarea class="fta" id="of-${f.id}">${val}</textarea></div>`;
+    }
+    if (f.type === 'tags') {
+      return `<div class="fg"><label class="fl">Tags</label>
+        <div id="of-tags-display" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">${currentOutreachTags.map(t=>`<span class="custom-tag">${t}<span class="custom-tag-remove" onclick="removeOutreachModalTag('${t}')">×</span></span>`).join('')}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">${outreachTags.filter(t=>!currentOutreachTags.includes(t)).map(t=>`<button class="graphic-el-btn" onclick="addOutreachModalTag('${t}')">${t}</button>`).join('')}</div>
+        <div style="display:flex;gap:8px"><input class="fi" id="of-tag-input" placeholder="Custom tag…" style="flex:1" onkeydown="if(event.key==='Enter'){addOutreachModalCustomTag();event.preventDefault()}"><button class="add-custom-btn" onclick="addOutreachModalCustomTag()">Add</button></div>
+      </div>`;
+    }
+    return `<div class="fg"><label class="fl">${f.label}${f.required?'':''}</label><input class="fi" id="of-${f.id}" value="${val.replace(/"/g,'&quot;')}" ${f.required?'required':''}></div>`;
+  }).join('');
+
+  document.getElementById('modal-outreach').classList.add('open');
+}
+
+function closeOutreachModal() { document.getElementById('modal-outreach').classList.remove('open'); }
+
+function addOutreachModalTag(tag) {
+  if (!currentOutreachTags.includes(tag)) currentOutreachTags.push(tag);
+  refreshOutreachModalTags();
+}
+function removeOutreachModalTag(tag) {
+  currentOutreachTags = currentOutreachTags.filter(t => t !== tag);
+  refreshOutreachModalTags();
+}
+async function addOutreachModalCustomTag() {
+  const val = document.getElementById('of-tag-input').value.trim();
+  if (!val) return;
+  if (!outreachTags.includes(val)) {
+    await sb.from('outreach_tags').insert({ user_id: currentUser.id, tag: val });
+    outreachTags.push(val);
+  }
+  addOutreachModalTag(val);
+  document.getElementById('of-tag-input').value = '';
+}
+function refreshOutreachModalTags() {
+  const display = document.getElementById('of-tags-display');
+  if (display) display.innerHTML = currentOutreachTags.map(t=>`<span class="custom-tag">${t}<span class="custom-tag-remove" onclick="removeOutreachModalTag('${t}')">×</span></span>`).join('');
+}
+
+async function saveOutreach() {
+  const type = document.getElementById('outreach-modal-type').value;
+  const editId = document.getElementById('outreach-modal-editing-id').value;
+  const name = document.getElementById('of-name')?.value.trim();
+  if (!name) { showToast('Please enter a name'); return; }
+
+  const btn = document.getElementById('outreach-submit-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  const row = { user_id: currentUser.id, tags: JSON.stringify(currentOutreachTags) };
+  OUTREACH_FIELDS[type].filter(f => f.type !== 'tags').forEach(f => {
+    const el = document.getElementById('of-'+f.id);
+    if (el) row[f.id] = el.value;
+  });
+
+  let error;
+  if (editId) {
+    ({ error } = await sb.from(OUTREACH_TABLES[type]).update(row).eq('id', editId));
+  } else {
+    const { data } = await sb.from(OUTREACH_TABLES[type]).insert(row).select().single();
+    if (data) outreachData[type].unshift(data);
+  }
+
+  if (!error && editId) {
+    const idx = outreachData[type].findIndex(r => r.id === editId);
+    if (idx >= 0) outreachData[type][idx] = { ...outreachData[type][idx], ...row };
+  }
+
+  btn.disabled = false; btn.textContent = 'Save';
+  if (error) { showToast('Error — ' + error.message); return; }
+  showToast('Saved ✦');
+  closeOutreachModal();
+  renderOutreach(type);
+}
+
+/* ── DIARY ──────────────────────────────────────── */
+function openDiaryModal(type, recordId, recordName) {
+  document.getElementById('diary-modal-title').textContent = 'Diary';
+  document.getElementById('diary-modal-subtitle').textContent = recordName;
+  document.getElementById('diary-record-type').value = type;
+  document.getElementById('diary-record-id').value = recordId;
+  document.getElementById('diary-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('diary-content').value = '';
+  document.getElementById('diary-followup-date').value = '';
+  document.getElementById('diary-followup-note').value = '';
+  currentDiaryTags = [];
+  renderDiaryTagSelector();
+  renderDiaryEntries(recordId);
+  document.getElementById('modal-diary').classList.add('open');
+}
+function closeDiaryModal() { document.getElementById('modal-diary').classList.remove('open'); }
+
+function renderDiaryTagSelector() {
+  const container = document.getElementById('diary-tag-selector');
+  if (!container) return;
+  container.innerHTML = outreachTags.map(t => {
+    const sel = currentDiaryTags.includes(t);
+    return `<button class="graphic-el-btn ${sel?'selected':''}" onclick="toggleDiaryTag('${t}')">${t}</button>`;
+  }).join('');
+}
+
+function toggleDiaryTag(tag) {
+  if (currentDiaryTags.includes(tag)) currentDiaryTags = currentDiaryTags.filter(t=>t!==tag);
+  else currentDiaryTags.push(tag);
+  renderDiaryTagSelector();
+}
+
+async function addDiaryTag() {
+  const val = document.getElementById('diary-new-tag').value.trim();
+  if (!val) return;
+  if (!outreachTags.includes(val)) {
+    await sb.from('outreach_tags').insert({ user_id: currentUser.id, tag: val });
+    outreachTags.push(val);
+  }
+  if (!currentDiaryTags.includes(val)) currentDiaryTags.push(val);
+  document.getElementById('diary-new-tag').value = '';
+  renderDiaryTagSelector();
+}
+
+function renderDiaryEntries(recordId) {
+  const entries = outreachDiary.filter(d => d.record_id === recordId);
+  const container = document.getElementById('diary-entries-list');
+  if (!entries.length) { container.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px 0">No diary entries yet.</div>'; return; }
+  container.innerHTML = entries.map(e => {
+    const tags = e.tags ? JSON.parse(e.tags) : [];
+    const dateStr = new Date(e.entry_date + 'T12:00:00').toLocaleDateString('en-US', {weekday:'short',month:'long',day:'numeric',year:'numeric'});
+    const followupStr = e.follow_up_date ? new Date(e.follow_up_date + 'T12:00:00').toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'}) : null;
+    const isOverdue = followupStr && new Date(e.follow_up_date) < new Date();
+    return `<div class="diary-entry">
+      <div class="diary-entry-date">${dateStr}</div>
+      <div class="diary-entry-content">${e.content}</div>
+      ${tags.length ? `<div class="outreach-tags" style="margin-top:6px">${tags.map(t=>`<span class="outreach-tag">${t}</span>`).join('')}</div>` : ''}
+      ${followupStr ? `<div class="diary-followup ${isOverdue?'overdue':''}">⚑ Follow-up: ${followupStr}${e.follow_up_note ? ' — '+e.follow_up_note : ''}</div>` : ''}
+      <button onclick="deleteDiaryEntry('${e.id}')" style="font-size:10px;color:var(--muted);margin-top:6px">Delete</button>
+    </div>`;
+  }).join('');
+}
+
+async function saveDiaryEntry() {
+  const recordId = document.getElementById('diary-record-id').value;
+  const type = document.getElementById('diary-record-type').value;
+  const content = document.getElementById('diary-content').value.trim();
+  if (!content) { showToast('Please enter some content'); return; }
+  const row = {
+    user_id: currentUser.id,
+    record_type: type,
+    record_id: recordId,
+    entry_date: document.getElementById('diary-date').value,
+    content,
+    follow_up_date: document.getElementById('diary-followup-date').value || null,
+    follow_up_note: document.getElementById('diary-followup-note').value || null,
+    tags: JSON.stringify(currentDiaryTags)
+  };
+  const { data, error } = await sb.from('outreach_diary').insert(row).select().single();
+  if (error) { showToast('Error — ' + error.message); return; }
+  outreachDiary.unshift(data);
+  document.getElementById('diary-content').value = '';
+  document.getElementById('diary-followup-date').value = '';
+  document.getElementById('diary-followup-note').value = '';
+  currentDiaryTags = [];
+  renderDiaryTagSelector();
+  renderDiaryEntries(recordId);
+  renderOutreach(type);
+  showToast('Entry saved ✦');
+}
+
+async function deleteDiaryEntry(id) {
+  if (!confirm('Delete this diary entry?')) return;
+  await sb.from('outreach_diary').delete().eq('id', id);
+  outreachDiary = outreachDiary.filter(d => d.id !== id);
+  const recordId = document.getElementById('diary-record-id').value;
+  renderDiaryEntries(recordId);
+}
+
+/* ── EXPORT ─────────────────────────────────────── */
+function exportOutreach(type) {
+  const data = outreachData[type];
+  if (!data.length) { showToast('Nothing to export'); return; }
+  const fields = OUTREACH_FIELDS[type].filter(f => f.type !== 'tags').map(f => f.id);
+  const headers = ['id', ...fields, 'tags', 'diary_entries', 'created_at'];
+
+  const rows = data.map(r => {
+    const diary = outreachDiary.filter(d => d.record_id === r.id)
+      .map(d => `${d.entry_date}: ${d.content}${d.follow_up_date?' [Follow-up: '+d.follow_up_date+(d.follow_up_note?' — '+d.follow_up_note:'')+']':''}`)
+      .join(' | ');
+    return headers.map(h => {
+      if (h === 'diary_entries') return `"${diary.replace(/"/g,'""')}"`;
+      const val = r[h] || '';
+      return `"${String(val).replace(/"/g,'""')}"`;
+    }).join(',');
+  });
+
+  const csv = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `evoke-${type}-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+  showToast('Exported ✦');
 }
 
 /* ══════════════════════════════════════════════════════════
