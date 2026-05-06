@@ -2650,13 +2650,15 @@ function exportOutreach(type) {
 
 function exportAll() {
   const timestamp = new Date().toISOString().slice(0,10);
-  // Export each outreach section
+
+  // Outreach sections
   ['resellers','festivals','markets'].forEach(type => {
     if (outreachData[type].length) exportOutreach(type);
   });
-  // Export packaging concepts
+
+  // Packaging catalogue
   if (packagingData.length) {
-    const headers = ['id','brand','product_description','format','profile','closure','size','orientation','inner_wrap','graphic_elements','colours','what_works','what_to_borrow','what_doesnt_work','created_at'];
+    const headers = ['id','brand','product_description','format','profile','closure','size','orientation','inner_wrap','graphic_elements','colours','what_works','what_to_borrow','what_doesnt_work'];
     const rows = packagingData.map(p => headers.map(h => {
       let val = '';
       if (h === 'brand') val = p.brand;
@@ -2677,17 +2679,53 @@ function exportAll() {
     }).join(','));
     downloadCSV([headers.join(','),...rows].join('\n'), `evoke-packaging-catalogue-${timestamp}.csv`);
   }
-  // Export lab experiments
+
+  // Lab experiments
   if (labData.length) {
-    const headers = ['id','name','product_type','status','description','versions_count','latest_cogs'];
+    const headers = ['name','product_type','status','description','versions_count','latest_cogs'];
     const rows = labData.map(e => {
       const latest = e.versions[e.versions.length-1];
       const cogs = latest ? calcCogs(latest.ingredients) : 0;
-      return [e.id, e.name, e.productType, e.status, e.description||'', e.versions.length, cogs.toFixed(2)]
+      return [e.name, e.productType, e.status, e.description||'', e.versions.length, cogs.toFixed(2)]
         .map(v => `"${String(v).replace(/"/g,'""')}"`).join(',');
     });
     downloadCSV([headers.join(','),...rows].join('\n'), `evoke-lab-${timestamp}.csv`);
   }
+
+  // Production ready products
+  if (productData.length) {
+    const headers = ['name','tagline','category','price','notes'];
+    const rows = productData.map(p => [p.name, p.tagline||'', p.cat||'', p.price||'', p.notes||'']
+      .map(v => `"${String(v).replace(/"/g,'""')}"`).join(','));
+    downloadCSV([headers.join(','),...rows].join('\n'), `evoke-products-${timestamp}.csv`);
+  }
+
+  // Briefs
+  if (briefsData.length) {
+    const headers = ['name','status','created_at','brief_content'];
+    const rows = briefsData.map(b => [
+      b.name, b.status||'',
+      new Date(b.created_at).toLocaleDateString(),
+      (b.brief_content||'').slice(0,2000) // truncate for CSV readability
+    ].map(v => `"${String(v).replace(/"/g,'""')}"`).join(','));
+    downloadCSV([headers.join(','),...rows].join('\n'), `evoke-briefs-${timestamp}.csv`);
+  }
+
+  // Brand foundation
+  const bf = {
+    origin_story: document.getElementById('bf-origin-story')?.value || '',
+    mission: document.getElementById('bf-mission')?.value || '',
+    tone_of_voice: document.getElementById('bf-tone')?.value || '',
+    target_customer: document.getElementById('bf-target')?.value || '',
+    price_positioning: document.getElementById('bf-price')?.value || '',
+    design_direction_notes: document.getElementById('bf-design-notes')?.value || ''
+  };
+  if (Object.values(bf).some(v => v)) {
+    const headers = Object.keys(bf);
+    const row = headers.map(h => `"${bf[h].replace(/"/g,'""')}"`).join(',');
+    downloadCSV([headers.join(','), row].join('\n'), `evoke-brand-foundation-${timestamp}.csv`);
+  }
+
   showToast('All data exported ✦');
 }
 
