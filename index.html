@@ -491,6 +491,7 @@ input[type="file"] { display: none; }
       </div>
     </div>
     <div class="nav-right">
+      <button class="nav-signout" onclick="exportAll()" style="color:rgba(247,242,236,0.45);border:1px solid rgba(247,242,236,0.15);border-radius:6px;padding:4px 12px;font-size:11px;margin-right:4px">Export all</button>
       <span class="nav-user" id="nav-user-email"></span>
       <button class="nav-signout" onclick="signOut()">Sign out</button>
     </div>
@@ -2398,7 +2399,9 @@ const OUTREACH_FIELDS = {
     { id:'type', label:'Type', type:'select', options:['Specialty food store','Gift shop','Online retailer','Hotel / hospitality','Restaurant / café','Other'] },
     { id:'contact_name', label:'Contact name' },
     { id:'email', label:'Email' },
+    { id:'phone', label:'Phone' },
     { id:'website', label:'Website' },
+    { id:'social', label:'Social profiles', placeholder:'Instagram, LinkedIn, etc.' },
     { id:'status', label:'Status', type:'select', options:['Prospect','Contacted','In discussion','Active','Passed'] },
     { id:'notes', label:'Notes', type:'textarea' },
     { id:'tags', label:'Tags', type:'tags' }
@@ -2408,6 +2411,7 @@ const OUTREACH_FIELDS = {
     { id:'location', label:'Location (city, country)' },
     { id:'dates', label:'Dates' },
     { id:'website', label:'Website' },
+    { id:'social', label:'Social profiles' },
     { id:'application_deadline', label:'Application deadline' },
     { id:'booth_cost', label:'Booth cost' },
     { id:'attendance_size', label:'Attendance size' },
@@ -2421,6 +2425,7 @@ const OUTREACH_FIELDS = {
     { id:'frequency', label:'Frequency', type:'select', options:['Weekly','Bi-weekly','Monthly','Seasonal','Annual','One-off'] },
     { id:'dates', label:'Dates / schedule' },
     { id:'website', label:'Website' },
+    { id:'social', label:'Social profiles' },
     { id:'contact', label:'Contact' },
     { id:'booth_cost', label:'Booth cost' },
     { id:'status', label:'Status', type:'select', options:['On radar','Applied','Accepted','Regular','Passed'] },
@@ -2639,12 +2644,59 @@ function exportOutreach(type) {
   });
 
   const csv = [headers.join(','), ...rows].join('\n');
+  downloadCSV(csv, `evoke-${type}-${new Date().toISOString().slice(0,10)}.csv`);
+  showToast('Exported ✦');
+}
+
+function exportAll() {
+  const timestamp = new Date().toISOString().slice(0,10);
+  // Export each outreach section
+  ['resellers','festivals','markets'].forEach(type => {
+    if (outreachData[type].length) exportOutreach(type);
+  });
+  // Export packaging concepts
+  if (packagingData.length) {
+    const headers = ['id','brand','product_description','format','profile','closure','size','orientation','inner_wrap','graphic_elements','colours','what_works','what_to_borrow','what_doesnt_work','created_at'];
+    const rows = packagingData.map(p => headers.map(h => {
+      let val = '';
+      if (h === 'brand') val = p.brand;
+      else if (h === 'product_description') val = p.desc;
+      else if (h === 'format') val = (p.format||[]).join(', ');
+      else if (h === 'profile') val = (p.profile||[]).join(', ');
+      else if (h === 'closure') val = (p.closure||[]).join(', ');
+      else if (h === 'size') val = p.size;
+      else if (h === 'orientation') val = p.orient;
+      else if (h === 'inner_wrap') val = p.inner;
+      else if (h === 'graphic_elements') val = (p.graphicElements||[]).join(', ');
+      else if (h === 'colours') val = (p.colors||[]).join(', ');
+      else if (h === 'what_works') val = p.whatWorks;
+      else if (h === 'what_to_borrow') val = p.whatToBorrow;
+      else if (h === 'what_doesnt_work') val = p.whatDoesntWork;
+      else val = p[h] || '';
+      return `"${String(val||'').replace(/"/g,'""')}"`;
+    }).join(','));
+    downloadCSV([headers.join(','),...rows].join('\n'), `evoke-packaging-catalogue-${timestamp}.csv`);
+  }
+  // Export lab experiments
+  if (labData.length) {
+    const headers = ['id','name','product_type','status','description','versions_count','latest_cogs'];
+    const rows = labData.map(e => {
+      const latest = e.versions[e.versions.length-1];
+      const cogs = latest ? calcCogs(latest.ingredients) : 0;
+      return [e.id, e.name, e.productType, e.status, e.description||'', e.versions.length, cogs.toFixed(2)]
+        .map(v => `"${String(v).replace(/"/g,'""')}"`).join(',');
+    });
+    downloadCSV([headers.join(','),...rows].join('\n'), `evoke-lab-${timestamp}.csv`);
+  }
+  showToast('All data exported ✦');
+}
+
+function downloadCSV(csv, filename) {
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = `evoke-${type}-${new Date().toISOString().slice(0,10)}.csv`;
+  a.href = url; a.download = filename;
   a.click(); URL.revokeObjectURL(url);
-  showToast('Exported ✦');
 }
 
 /* ══════════════════════════════════════════════════════════
