@@ -639,6 +639,32 @@ input[type="file"] { display: none; }
     <div class="fg"><label class="fl">Notes — what you changed and why</label><textarea class="fta" id="ver-notes" placeholder="Reduced sugar from 28% to 24% to bring out more bitterness. Extended conch time to smooth texture."></textarea></div>
     <div class="fg"><label class="fl">Outcome</label><textarea class="fta" id="ver-outcome" placeholder="Leave blank until you've tasted and evaluated this version."></textarea></div>
 
+    <div class="fg">
+      <label class="fl">Photos <span style="font-weight:300;text-transform:none;font-size:11px;letter-spacing:0">— batch, texture, finished product</span></label>
+      <div class="img-upload-grid" id="ver-img-grid">
+        <div class="img-slot" id="ver-img-slot-0" onclick="triggerVerUpload(0)">
+          <input type="file" id="ver-img-file-0" accept="image/*" onchange="handleVerImageFile(0,this)">
+          <div class="img-slot-icon">+</div><div class="img-slot-label">Photo 1</div>
+          <button class="img-slot-remove" onclick="removeVerImage(event,0)">×</button>
+        </div>
+        <div class="img-slot" id="ver-img-slot-1" onclick="triggerVerUpload(1)">
+          <input type="file" id="ver-img-file-1" accept="image/*" onchange="handleVerImageFile(1,this)">
+          <div class="img-slot-icon">+</div><div class="img-slot-label">Photo 2</div>
+          <button class="img-slot-remove" onclick="removeVerImage(event,1)">×</button>
+        </div>
+        <div class="img-slot" id="ver-img-slot-2" onclick="triggerVerUpload(2)">
+          <input type="file" id="ver-img-file-2" accept="image/*" onchange="handleVerImageFile(2,this)">
+          <div class="img-slot-icon">+</div><div class="img-slot-label">Photo 3</div>
+          <button class="img-slot-remove" onclick="removeVerImage(event,2)">×</button>
+        </div>
+        <div class="img-slot" id="ver-img-slot-3" onclick="triggerVerUpload(3)">
+          <input type="file" id="ver-img-file-3" accept="image/*" onchange="handleVerImageFile(3,this)">
+          <div class="img-slot-icon">+</div><div class="img-slot-label">Photo 4</div>
+          <button class="img-slot-remove" onclick="removeVerImage(event,3)">×</button>
+        </div>
+      </div>
+    </div>
+
     <input type="hidden" id="ver-experiment-id" value="">
     <input type="hidden" id="ver-editing-id" value="">
     <button class="submit-btn" id="ver-submit-btn" onclick="saveVersion()">Save Version</button>
@@ -708,6 +734,7 @@ input[type="file"] { display: none; }
       <span class="detail-topbar-label" id="brief-detail-label">Brief</span>
       <div style="display:flex;gap:8px">
         <button class="detail-topbar-close" id="brief-regenerate-btn" onclick="regenerateBrief()" style="width:auto;padding:0 14px;font-size:11px;letter-spacing:0.05em">↻ Regenerate</button>
+        <button class="detail-topbar-close" onclick="deleteBrief()" style="width:auto;padding:0 14px;font-size:11px;letter-spacing:0.05em;color:rgba(255,120,100,0.8);border-color:rgba(255,120,100,0.3)">Delete</button>
         <button class="detail-topbar-close" onclick="closeBriefDetail()">✕</button>
       </div>
     </div>
@@ -2539,6 +2566,18 @@ function openBriefDetail(id) {
   document.getElementById('brief-detail-overlay').classList.add('open');
 }
 
+async function deleteBrief() {
+  if (!currentBriefId) return;
+  const b = briefsData.find(x => x.id === currentBriefId);
+  if (!confirm(`Delete "${b?.name}"? This cannot be undone.`)) return;
+  const { error } = await sb.from('briefs').delete().eq('id', currentBriefId);
+  if (error) { showToast('Error — ' + error.message); return; }
+  briefsData = briefsData.filter(x => x.id !== currentBriefId);
+  showToast('Brief deleted');
+  closeBriefDetail();
+  renderBriefs();
+}
+
 function closeBriefDetail() { document.getElementById('brief-detail-overlay').classList.remove('open'); currentBriefId = null; }
 
 async function saveBriefEdits(id) {
@@ -2698,7 +2737,59 @@ At the end of the ## Colour Palette section, include a JSON block with exactly 4
 ══════════════════════════════════════════════════════════ */
 let labData = []; // experiments with nested versions
 let labFilter = 'all';
-let verIngRowCount = 0;
+async function quickUpdateStatus(expId, status) {
+  const { error } = await sb.from('lab_experiments').update({ status, updated_at: new Date().toISOString() }).eq('id', expId);
+  if (error) { showToast('Error — ' + error.message); return; }
+  const exp = labData.find(e => e.id === expId);
+  if (exp) exp.status = status;
+  showToast('Status updated ✦');
+  renderLab(labData);
+}
+
+let verPendingImages = [null,null,null,null];
+let verExistingImages = [null,null,null,null];
+
+function triggerVerUpload(i) {
+  if (!document.getElementById('ver-img-slot-'+i).classList.contains('has-image'))
+    document.getElementById('ver-img-file-'+i).click();
+}
+
+async function handleVerImageFile(i, input) {
+  if (!input.files || !input.files[0]) return;
+  const file = input.files[0];
+  verPendingImages[i] = file;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const slot = document.getElementById('ver-img-slot-'+i);
+    let img = slot.querySelector('img');
+    if (!img) { img = document.createElement('img'); slot.prepend(img); }
+    img.src = e.target.result;
+    slot.classList.add('has-image');
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeVerImage(e, i) {
+  e.stopPropagation();
+  verPendingImages[i] = null;
+  verExistingImages[i] = null;
+  const slot = document.getElementById('ver-img-slot-'+i);
+  slot.classList.remove('has-image');
+  const img = slot.querySelector('img'); if (img) img.remove();
+  document.getElementById('ver-img-file-'+i).value = '';
+}
+
+function resetVerImages() {
+  verPendingImages = [null,null,null,null];
+  verExistingImages = [null,null,null,null];
+  [0,1,2,3].forEach(i => {
+    const slot = document.getElementById('ver-img-slot-'+i);
+    if (!slot) return;
+    slot.classList.remove('has-image');
+    const img = slot.querySelector('img'); if (img) img.remove();
+    const f = document.getElementById('ver-img-file-'+i); if (f) f.value = '';
+  });
+}
 
 /* ══════════════════════════════════════════════════════════
    LAB LOAD
@@ -2721,6 +2812,7 @@ async function loadLabData() {
           notes: v.notes, outcome: v.outcome,
           recipeSteps: v.recipe_steps ? JSON.parse(v.recipe_steps) : [],
           ingredients: v.ingredients ? JSON.parse(v.ingredients) : [],
+          images: v.images ? JSON.parse(v.images) : [],
           createdAt: v.created_at
         }))
     }));
@@ -2759,7 +2851,9 @@ function renderLab(data) {
           <div class="lab-card-meta">${exp.productType}${exp.versions.length ? ` · ${exp.versions.length} version${exp.versions.length>1?'s':''}` : ' · no versions yet'}</div>
         </div>
         <div class="lab-card-chips">
-          <span class="chip ${statusChipClass(exp.status)}">${exp.status}</span>
+          <select class="chip ${statusChipClass(exp.status)}" onchange="quickUpdateStatus('${exp.id}',this.value)" onclick="event.stopPropagation()" style="border:none;cursor:pointer;font-size:11px;font-weight:500;padding:3px 6px;border-radius:999px;appearance:none;-webkit-appearance:none">
+            ${['Active','On hold','Ready to promote','Abandoned'].map(s => `<option value="${s}" ${s===exp.status?'selected':''}>${s}</option>`).join('')}
+          </select>
           ${totalCogs > 0 ? `<span class="chip chip-cogs">$${totalCogs.toFixed(2)} COGS</span>` : ''}
         </div>
         <div class="lab-card-actions" onclick="event.stopPropagation()">
@@ -2813,6 +2907,7 @@ function renderLab(data) {
                   </div>
                 </div>
                 ${ver.outcome ? `<div class="version-outcome"><div class="version-outcome-label">Outcome</div>${ver.outcome}</div>` : ''}
+                ${ver.images && ver.images.length ? `<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">${ver.images.map(url => `<img src="${url}" onclick="openLightbox('${url}')" style="width:80px;height:80px;object-fit:cover;border-radius:6px;cursor:pointer;border:1px solid var(--border)">`).join('')}</div>` : ''}
               </div>
             </div>`;
           }).join('') : '<div style="font-size:12px;color:var(--muted)">No versions yet — hit "+ Version" to add the first.</div>'}
@@ -2911,6 +3006,20 @@ function openVersionModal(experimentId, editVersionId) {
   if (ver && ver.ingredients.length) ver.ingredients.forEach(i => addVerIngRow(i));
   else addVerIngRow();
 
+  resetVerImages();
+  if (ver && ver.images) {
+    const imgs = typeof ver.images === 'string' ? JSON.parse(ver.images) : ver.images;
+    imgs.forEach((url, i) => {
+      if (!url) return;
+      verExistingImages[i] = url;
+      const slot = document.getElementById('ver-img-slot-'+i);
+      if (!slot) return;
+      let img = slot.querySelector('img');
+      if (!img) { img = document.createElement('img'); slot.prepend(img); }
+      img.src = url; slot.classList.add('has-image');
+    });
+  }
+
   document.getElementById('modal-version').classList.add('open');
 }
 
@@ -2952,6 +3061,21 @@ async function saveVersion() {
   const editId = document.getElementById('ver-editing-id').value;
   const btn = document.getElementById('ver-submit-btn');
   btn.disabled = true; btn.textContent = 'Saving…';
+
+  // Upload new images
+  const imageUrls = [...verExistingImages];
+  for (let i = 0; i < 4; i++) {
+    if (verPendingImages[i]) {
+      const file = verPendingImages[i];
+      const path = `lab/${currentUser.id}/${Date.now()}-${i}-${file.name.replace(/\s+/g,'_')}`;
+      const { error } = await sb.storage.from('packaging-images').upload(path, file);
+      if (!error) {
+        const { data: urlData } = sb.storage.from('packaging-images').getPublicUrl(path);
+        imageUrls[i] = urlData.publicUrl;
+      }
+    }
+  }
+
   const exp = labData.find(e => e.id === experimentId);
   const nextNum = editId ? exp.versions.find(v => v.id === editId).versionNumber : (exp.versions.length + 1);
   const row = {
@@ -2961,7 +3085,8 @@ async function saveVersion() {
     notes: document.getElementById('ver-notes').value,
     outcome: document.getElementById('ver-outcome').value,
     recipe_steps: JSON.stringify(document.getElementById('ver-recipe').value.split('\n').filter(Boolean)),
-    ingredients: JSON.stringify(getVerIngredients())
+    ingredients: JSON.stringify(getVerIngredients()),
+    images: JSON.stringify(imageUrls.filter(Boolean))
   };
   let error;
   if (editId) { ({ error } = await sb.from('lab_versions').update(row).eq('id', editId)); }
