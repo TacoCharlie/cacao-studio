@@ -491,7 +491,7 @@ input[type="file"] { display: none; }
       </div>
     </div>
     <div class="nav-right">
-      <button class="nav-signout" onclick="exportAll()" style="color:rgba(247,242,236,0.45);border:1px solid rgba(247,242,236,0.15);border-radius:6px;padding:4px 12px;font-size:11px;margin-right:4px">Export all</button>
+      <button class="nav-signout" onclick="openExportModal()" style="color:rgba(247,242,236,0.45);border:1px solid rgba(247,242,236,0.15);border-radius:6px;padding:4px 12px;font-size:11px;margin-right:4px">Export</button>
       <span class="nav-user" id="nav-user-email"></span>
       <button class="nav-signout" onclick="signOut()">Sign out</button>
     </div>
@@ -881,6 +881,36 @@ input[type="file"] { display: none; }
         <div id="brief-ref-sidebar-items" style="display:flex;flex-direction:column;gap:8px"></div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- EXPORT MODAL -->
+<div class="modal-overlay" id="modal-export" onclick="if(event.target===this)closeExportModal()">
+  <div class="modal" style="width:min(460px,94vw)" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title">Export Data</div>
+      <button class="modal-x" onclick="closeExportModal()">✕</button>
+    </div>
+    <div class="modal-subtitle">Select sections to export as CSV files</div>
+    <div style="margin:16px 0;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+      <label style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--parchment);border-bottom:1px solid var(--border);cursor:pointer;font-size:12px;font-weight:500">
+        <input type="checkbox" id="export-all-check" onchange="toggleExportAll(this)" style="accent-color:var(--ink)"> Select all
+      </label>
+      ${[
+        ['export-packaging','Packaging Catalogue'],
+        ['export-brand','Brand Foundation'],
+        ['export-briefs','Briefs'],
+        ['export-lab','Lab Experiments'],
+        ['export-products','Production Ready Products'],
+        ['export-resellers','Resellers'],
+        ['export-festivals','Chocolate Festivals'],
+        ['export-markets','Markets']
+      ].map(([id,label]) => `
+      <label style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer;font-size:12px" class="export-row">
+        <input type="checkbox" id="${id}" checked style="accent-color:var(--ink)"> ${label}
+      </label>`).join('')}
+    </div>
+    <button class="submit-btn" onclick="runExport()">Download selected</button>
   </div>
 </div>
 
@@ -2648,85 +2678,85 @@ function exportOutreach(type) {
   showToast('Exported ✦');
 }
 
-function exportAll() {
+function openExportModal() {
+  // Check all by default
+  document.querySelectorAll('#modal-export input[type="checkbox"]').forEach(cb => cb.checked = true);
+  document.getElementById('modal-export').classList.add('open');
+}
+function closeExportModal() { document.getElementById('modal-export').classList.remove('open'); }
+
+function toggleExportAll(master) {
+  document.querySelectorAll('#modal-export .export-row input').forEach(cb => cb.checked = master.checked);
+}
+
+function runExport() {
   const timestamp = new Date().toISOString().slice(0,10);
+  let count = 0;
 
-  // Outreach sections
-  ['resellers','festivals','markets'].forEach(type => {
-    if (outreachData[type].length) exportOutreach(type);
-  });
-
-  // Packaging catalogue
-  if (packagingData.length) {
-    const headers = ['id','brand','product_description','format','profile','closure','size','orientation','inner_wrap','graphic_elements','colours','what_works','what_to_borrow','what_doesnt_work'];
-    const rows = packagingData.map(p => headers.map(h => {
-      let val = '';
-      if (h === 'brand') val = p.brand;
-      else if (h === 'product_description') val = p.desc;
-      else if (h === 'format') val = (p.format||[]).join(', ');
-      else if (h === 'profile') val = (p.profile||[]).join(', ');
-      else if (h === 'closure') val = (p.closure||[]).join(', ');
-      else if (h === 'size') val = p.size;
-      else if (h === 'orientation') val = p.orient;
-      else if (h === 'inner_wrap') val = p.inner;
-      else if (h === 'graphic_elements') val = (p.graphicElements||[]).join(', ');
-      else if (h === 'colours') val = (p.colors||[]).join(', ');
-      else if (h === 'what_works') val = p.whatWorks;
-      else if (h === 'what_to_borrow') val = p.whatToBorrow;
-      else if (h === 'what_doesnt_work') val = p.whatDoesntWork;
-      else val = p[h] || '';
-      return `"${String(val||'').replace(/"/g,'""')}"`;
-    }).join(','));
+  if (document.getElementById('export-packaging')?.checked && packagingData.length) {
+    const headers = ['brand','product_description','format','profile','closure','size','orientation','inner_wrap','graphic_elements','colours','what_works','what_to_borrow','what_doesnt_work'];
+    const rows = packagingData.map(p => [
+      p.brand, p.desc, (p.format||[]).join(', '), (p.profile||[]).join(', '), (p.closure||[]).join(', '),
+      p.size, p.orient, p.inner, (p.graphicElements||[]).join(', '), (p.colors||[]).join(', '),
+      p.whatWorks, p.whatToBorrow, p.whatDoesntWork
+    ].map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(','));
     downloadCSV([headers.join(','),...rows].join('\n'), `evoke-packaging-catalogue-${timestamp}.csv`);
+    count++;
   }
 
-  // Lab experiments
-  if (labData.length) {
+  if (document.getElementById('export-brand')?.checked) {
+    const bf = {
+      origin_story: document.getElementById('bf-origin-story')?.value || '',
+      mission: document.getElementById('bf-mission')?.value || '',
+      tone_of_voice: document.getElementById('bf-tone')?.value || '',
+      target_customer: document.getElementById('bf-target')?.value || '',
+      price_positioning: document.getElementById('bf-price')?.value || '',
+      design_direction_notes: document.getElementById('bf-design-notes')?.value || ''
+    };
+    if (Object.values(bf).some(v => v)) {
+      const headers = Object.keys(bf);
+      downloadCSV([headers.join(','), headers.map(h=>`"${bf[h].replace(/"/g,'""')}"`).join(',')].join('\n'), `evoke-brand-foundation-${timestamp}.csv`);
+      count++;
+    }
+  }
+
+  if (document.getElementById('export-briefs')?.checked && briefsData.length) {
+    const headers = ['name','status','created_at','brief_content'];
+    const rows = briefsData.map(b => [
+      b.name, b.status||'', new Date(b.created_at).toLocaleDateString(), (b.brief_content||'').slice(0,2000)
+    ].map(v => `"${String(v).replace(/"/g,'""')}"`).join(','));
+    downloadCSV([headers.join(','),...rows].join('\n'), `evoke-briefs-${timestamp}.csv`);
+    count++;
+  }
+
+  if (document.getElementById('export-lab')?.checked && labData.length) {
     const headers = ['name','product_type','status','description','versions_count','latest_cogs'];
     const rows = labData.map(e => {
       const latest = e.versions[e.versions.length-1];
-      const cogs = latest ? calcCogs(latest.ingredients) : 0;
-      return [e.name, e.productType, e.status, e.description||'', e.versions.length, cogs.toFixed(2)]
+      return [e.name, e.productType, e.status, e.description||'', e.versions.length, latest?calcCogs(latest.ingredients).toFixed(2):0]
         .map(v => `"${String(v).replace(/"/g,'""')}"`).join(',');
     });
     downloadCSV([headers.join(','),...rows].join('\n'), `evoke-lab-${timestamp}.csv`);
+    count++;
   }
 
-  // Production ready products
-  if (productData.length) {
+  if (document.getElementById('export-products')?.checked && productData.length) {
     const headers = ['name','tagline','category','price','notes'];
     const rows = productData.map(p => [p.name, p.tagline||'', p.cat||'', p.price||'', p.notes||'']
       .map(v => `"${String(v).replace(/"/g,'""')}"`).join(','));
     downloadCSV([headers.join(','),...rows].join('\n'), `evoke-products-${timestamp}.csv`);
+    count++;
   }
 
-  // Briefs
-  if (briefsData.length) {
-    const headers = ['name','status','created_at','brief_content'];
-    const rows = briefsData.map(b => [
-      b.name, b.status||'',
-      new Date(b.created_at).toLocaleDateString(),
-      (b.brief_content||'').slice(0,2000) // truncate for CSV readability
-    ].map(v => `"${String(v).replace(/"/g,'""')}"`).join(','));
-    downloadCSV([headers.join(','),...rows].join('\n'), `evoke-briefs-${timestamp}.csv`);
-  }
+  ['resellers','festivals','markets'].forEach(type => {
+    if (document.getElementById(`export-${type}`)?.checked && outreachData[type].length) {
+      exportOutreach(type);
+      count++;
+    }
+  });
 
-  // Brand foundation
-  const bf = {
-    origin_story: document.getElementById('bf-origin-story')?.value || '',
-    mission: document.getElementById('bf-mission')?.value || '',
-    tone_of_voice: document.getElementById('bf-tone')?.value || '',
-    target_customer: document.getElementById('bf-target')?.value || '',
-    price_positioning: document.getElementById('bf-price')?.value || '',
-    design_direction_notes: document.getElementById('bf-design-notes')?.value || ''
-  };
-  if (Object.values(bf).some(v => v)) {
-    const headers = Object.keys(bf);
-    const row = headers.map(h => `"${bf[h].replace(/"/g,'""')}"`).join(',');
-    downloadCSV([headers.join(','), row].join('\n'), `evoke-brand-foundation-${timestamp}.csv`);
-  }
-
-  showToast('All data exported ✦');
+  closeExportModal();
+  showToast(count ? `${count} file${count>1?'s':''} exported ✦` : 'Nothing to export — sections may be empty');
 }
 
 function downloadCSV(csv, filename) {
