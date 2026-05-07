@@ -2389,6 +2389,7 @@ function renderOutreach(type) {
           <div class="outreach-card-meta">${meta}</div>
           ${tags.length ? `<div class="outreach-tags">${tags.map(t=>`<span class="outreach-tag">${t}</span>`).join('')}</div>` : ''}
           ${r.notes ? `<div class="outreach-card-notes">${r.notes}</div>` : ''}
+          ${r.website ? `<div class="outreach-card-notes" style="border-top:${r.notes ? 'none' : '1px solid var(--border)'};padding-top:${r.notes ? '4px' : '10px'}"><a href="${r.website.startsWith('http') ? r.website : 'https://'+r.website}" target="_blank" rel="noopener" style="color:var(--choc,#6B3A2A);text-decoration:none;font-size:12px">🔗 ${r.website}</a></div>` : ''}
         </div>
         <div class="outreach-card-actions">
           <select class="chip" onchange="quickUpdateOutreachStatus('${type}','${r.id}',this.value)" style="border:1px solid var(--border-md);cursor:pointer;font-size:11px;padding:3px 6px;border-radius:6px;appearance:none;background:var(--cream)">
