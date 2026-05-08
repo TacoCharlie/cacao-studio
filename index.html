@@ -2424,6 +2424,15 @@ async function quickUpdateOutreachStatus(type, id, status) {
   showToast('Status updated ✦');
 }
 
+async function deleteExperiment(id) {
+  if (!confirm('Delete this experiment and all its versions? This cannot be undone.')) return;
+  await sb.from('lab_versions').delete().eq('experiment_id', id);
+  await sb.from('lab_experiments').delete().eq('id', id);
+  labData = labData.filter(e => e.id !== id);
+  renderLab(labData);
+  showToast('Experiment deleted');
+}
+
 async function deleteOutreach(type, id) {
   if (!confirm('Delete this record? This cannot be undone.')) return;
   await sb.from(OUTREACH_TABLES[type]).delete().eq('id', id);
@@ -3506,6 +3515,7 @@ function renderLab(data) {
           ${exp.versions.length > 1 ? `<button class="lab-action-btn" onclick="openCompareModal('${exp.id}')">Compare</button>` : ''}
           ${exp.status === 'Ready to promote' ? `<button class="lab-action-btn promote" onclick="promoteToProduction('${exp.id}')">Promote →</button>` : ''}
           <button class="lab-action-btn" onclick="openVersionModal('${exp.id}')">+ Version</button>
+          <button class="lab-action-btn" onclick="deleteExperiment('${exp.id}')" style="color:rgba(200,80,60,0.7)">Del</button>
         </div>
       </div>
       <div class="lab-expand" id="lab-expand-${exp.id}">
