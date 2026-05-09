@@ -1279,28 +1279,12 @@ input[type="file"] { display: none; }
       <div class="fg"><label class="fl">Icon / emoji</label><input class="fi" id="pr-icon" placeholder="🍫" maxlength="4"></div>
     </div>
     <div class="fg">
-      <label class="fl">Photos <span style="font-weight:300;text-transform:none;font-size:11px;letter-spacing:0">— product shots, detail, packaging</span></label>
-      <div class="img-upload-grid" id="pr-img-grid">
-        <div class="img-slot" id="pr-img-slot-0" onclick="triggerProdUpload(0)">
-          <input type="file" id="pr-img-file-0" accept="image/*" onchange="handleProdImageFile(0,this)">
-          <div class="img-slot-icon">+</div><div class="img-slot-label">Photo 1</div>
-          <button class="img-slot-remove" onclick="removeProdImage(event,0)">×</button>
-        </div>
-        <div class="img-slot" id="pr-img-slot-1" onclick="triggerProdUpload(1)">
-          <input type="file" id="pr-img-file-1" accept="image/*" onchange="handleProdImageFile(1,this)">
-          <div class="img-slot-icon">+</div><div class="img-slot-label">Photo 2</div>
-          <button class="img-slot-remove" onclick="removeProdImage(event,1)">×</button>
-        </div>
-        <div class="img-slot" id="pr-img-slot-2" onclick="triggerProdUpload(2)">
-          <input type="file" id="pr-img-file-2" accept="image/*" onchange="handleProdImageFile(2,this)">
-          <div class="img-slot-icon">+</div><div class="img-slot-label">Photo 3</div>
-          <button class="img-slot-remove" onclick="removeProdImage(event,2)">×</button>
-        </div>
-        <div class="img-slot" id="pr-img-slot-3" onclick="triggerProdUpload(3)">
-          <input type="file" id="pr-img-file-3" accept="image/*" onchange="handleProdImageFile(3,this)">
-          <div class="img-slot-icon">+</div><div class="img-slot-label">Photo 4</div>
-          <button class="img-slot-remove" onclick="removeProdImage(event,3)">×</button>
-        </div>
+      <label class="fl">Photos — use images/filename.jpg</label>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+        <div class="img-path-row" style="flex-direction:column;align-items:flex-start;gap:3px"><span style="font-size:10px;color:var(--muted)">Photo 1</span><input class="fi" id="pr-img-0" placeholder="images/front.jpg"></div>
+        <div class="img-path-row" style="flex-direction:column;align-items:flex-start;gap:3px"><span style="font-size:10px;color:var(--muted)">Photo 2</span><input class="fi" id="pr-img-1" placeholder="images/detail.jpg"></div>
+        <div class="img-path-row" style="flex-direction:column;align-items:flex-start;gap:3px"><span style="font-size:10px;color:var(--muted)">Photo 3</span><input class="fi" id="pr-img-2" placeholder="images/bar.jpg"></div>
+        <div class="img-path-row" style="flex-direction:column;align-items:flex-start;gap:3px"><span style="font-size:10px;color:var(--muted)">Photo 4</span><input class="fi" id="pr-img-3" placeholder="images/open.jpg"></div>
       </div>
     </div>
     <div class="fg">
@@ -2212,8 +2196,7 @@ function openProductModal() {
   document.getElementById('prod-modal-title').textContent='Add Product';
   document.getElementById('prod-submit-btn').textContent='Save Product';
   document.getElementById('pr-editing-id').value='';
-  ['pr-name','pr-tagline','pr-price','pr-icon','pr-recipe','pr-notes'].forEach(id=>document.getElementById(id).value='');
-  resetProdImages();
+  ['pr-name','pr-tagline','pr-price','pr-icon','pr-recipe','pr-notes','pr-img-0','pr-img-1','pr-img-2','pr-img-3'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('pr-cat').selectedIndex=0;
   clearIngRows(); addIngRow();
   document.getElementById('modal-product').classList.add('open');
@@ -2230,8 +2213,7 @@ function editProduct(id) {
   document.getElementById('pr-recipe').value=(p.recipe||[]).join('\n');
   document.getElementById('pr-notes').value=p.notes||'';
   const imgs=p.images||[];
-  resetProdImages();
-  imgs.forEach((url,i)=>{ if(url && i<4){ prodExistingImages[i]=url; const slot=document.getElementById('pr-img-slot-'+i); let img=slot.querySelector('img'); if(!img){img=document.createElement('img');slot.prepend(img);} img.src=url; slot.classList.add('has-image'); } });
+  [0,1,2,3].forEach(i=>{document.getElementById('pr-img-'+i).value=imgs[i]||'';});
   const catEl=document.getElementById('pr-cat');
   Array.from(catEl.options).forEach((o,i)=>{if(o.value===p.cat)catEl.selectedIndex=i;});
   clearIngRows();
@@ -2239,26 +2221,14 @@ function editProduct(id) {
   if(!(p.ingredients||[]).length) addIngRow();
   document.getElementById('modal-product').classList.add('open');
 }
-function closeProductModal() { document.getElementById('modal-product').classList.remove('open'); resetProdImages(); }
+function closeProductModal() { document.getElementById('modal-product').classList.remove('open'); }
 
 async function saveProduct() {
   const name=document.getElementById('pr-name').value.trim(); if (!name) return;
   const btn=document.getElementById('prod-submit-btn');
   btn.disabled=true; btn.textContent='Saving…';
   const editingId=document.getElementById('pr-editing-id').value;
-
-  // Upload any pending product images
-  const imageUrls=[...prodExistingImages];
-  for(let i=0;i<4;i++){
-    if(prodPendingImages[i]){
-      const file=prodPendingImages[i];
-      const ext=file.name.split('.').pop();
-      const path=`products/${currentUser.id}/${Date.now()}_${i}.${ext}`;
-      const {error:upErr}=await sb.storage.from('packaging-images').upload(path,file);
-      if(!upErr){ const {data:ud}=sb.storage.from('packaging-images').getPublicUrl(path); imageUrls[i]=ud.publicUrl; }
-    }
-  }
-  const images=imageUrls.filter(Boolean);
+  const images=[0,1,2,3].map(i=>document.getElementById('pr-img-'+i).value.trim()).filter(Boolean);
   const productRow={user_id:currentUser.id,name,tagline:document.getElementById('pr-tagline').value||'',cat:document.getElementById('pr-cat').value,icon:document.getElementById('pr-icon').value||'🍫',price:parseFloat(document.getElementById('pr-price').value)||null,images:JSON.stringify(images),recipe:JSON.stringify(document.getElementById('pr-recipe').value.split('\n').filter(Boolean)),notes:document.getElementById('pr-notes').value||''};
   let productId=editingId;
   if (editingId) {
@@ -2452,6 +2422,15 @@ async function quickUpdateOutreachStatus(type, id, status) {
   if (rec) rec.status = status;
   renderOutreach(type);
   showToast('Status updated ✦');
+}
+
+async function deleteVersion(experimentId, versionId) {
+  if (!confirm('Delete this version? This cannot be undone.')) return;
+  await sb.from('lab_versions').delete().eq('id', versionId);
+  const exp = labData.find(e => e.id === experimentId);
+  if (exp) exp.versions = exp.versions.filter(v => v.id !== versionId);
+  renderLab(labData);
+  showToast('Version deleted');
 }
 
 async function deleteExperiment(id) {
@@ -3433,48 +3412,6 @@ async function quickUpdateStatus(expId, status) {
 let verPendingImages = [null,null,null,null];
 let verExistingImages = [null,null,null,null];
 
-let prodPendingImages = [null,null,null,null];
-let prodExistingImages = [null,null,null,null];
-
-function triggerProdUpload(i) {
-  if (!document.getElementById('pr-img-slot-'+i).classList.contains('has-image'))
-    document.getElementById('pr-img-file-'+i).click();
-}
-async function handleProdImageFile(i, input) {
-  if (!input.files || !input.files[0]) return;
-  const file = input.files[0];
-  prodPendingImages[i] = file;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const slot = document.getElementById('pr-img-slot-'+i);
-    let img = slot.querySelector('img');
-    if (!img) { img = document.createElement('img'); slot.prepend(img); }
-    img.src = e.target.result;
-    slot.classList.add('has-image');
-  };
-  reader.readAsDataURL(file);
-}
-function removeProdImage(e, i) {
-  e.stopPropagation();
-  prodPendingImages[i] = null;
-  prodExistingImages[i] = null;
-  const slot = document.getElementById('pr-img-slot-'+i);
-  slot.classList.remove('has-image');
-  const img = slot.querySelector('img'); if (img) img.remove();
-  document.getElementById('pr-img-file-'+i).value = '';
-}
-function resetProdImages() {
-  prodPendingImages = [null,null,null,null];
-  prodExistingImages = [null,null,null,null];
-  [0,1,2,3].forEach(i => {
-    const slot = document.getElementById('pr-img-slot-'+i);
-    if (!slot) return;
-    slot.classList.remove('has-image');
-    const img = slot.querySelector('img'); if (img) img.remove();
-    const f = document.getElementById('pr-img-file-'+i); if (f) f.value = '';
-  });
-}
-
 function triggerVerUpload(i) {
   if (!document.getElementById('ver-img-slot-'+i).classList.contains('has-image'))
     document.getElementById('ver-img-file-'+i).click();
@@ -3606,6 +3543,7 @@ function renderLab(data) {
                 <div class="version-date">${dateStr}</div>
                 ${cogs > 0 ? `<div class="version-cogs">$${cogs.toFixed(2)} COGS</div>` : ''}
                 <button class="version-edit-btn" onclick="event.stopPropagation();openVersionModal('${exp.id}','${ver.id}')">Edit</button>
+                <button class="version-edit-btn" onclick="event.stopPropagation();deleteVersion('${exp.id}','${ver.id}')" style="color:rgba(200,80,60,0.7);border-color:rgba(200,80,60,0.3)">Del</button>
               </div>
               <div class="version-body" id="vbody-${ver.id}">
                 <div class="version-grid">
