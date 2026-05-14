@@ -32,8 +32,8 @@
   --rating-2:  #C9963E;
   --rating-3:  #6E8A6C;
 }
-html { font-size: 15px; }
-body { font-family: var(--sans); background: var(--cream); color: var(--ink); min-height: 100vh; line-height: 1.6; }
+html { font-size: 15px; overflow-x: hidden; }
+body { font-family: var(--sans); background: var(--cream); color: var(--ink); min-height: 100vh; line-height: 1.6; overflow-x: hidden; }
 button { cursor: pointer; font-family: var(--sans); border: none; background: none; }
 input, select, textarea { font-family: var(--sans); font-size: 13px; }
 img { display: block; max-width: 100%; }
@@ -58,7 +58,6 @@ a:hover { text-decoration: underline; }
 .login-toggle a { color: var(--copper); cursor: pointer; }
 
 /* ── APP ────────────────────────────────────────────────── */
-html, body { overflow-x: hidden; max-width: 100vw; }
 #app { display: none; }
 .topnav { position: sticky; top: 0; z-index: 80; display: flex; align-items: center; justify-content: space-between; padding: 0 32px; height: 58px; background: var(--ink); border-bottom: 1px solid rgba(255,255,255,0.06); }
 .brand { font-family: var(--serif); font-size: 20px; font-weight: 300; color: var(--cream); letter-spacing: 0.12em; display: flex; align-items: center; gap: 10px; }
@@ -444,56 +443,35 @@ input[type="file"] { display: none; }
 
 /* ── MOBILE ─────────────────────────────────────────────── */
 @media (max-width: 600px) {
-  /* Nav */
+  html, body { overflow-x: hidden; max-width: 100vw; }
   .topnav { padding: 0 14px; gap: 8px; }
   .brand { font-size: 15px; letter-spacing: 0.08em; }
   .nav-tabs { gap: 0; }
   .nav-tab { padding: 6px 10px; font-size: 11px; }
   .nav-right { display: none; }
-
-  /* Pages */
   .page { padding: 20px 14px 40px; }
   .page-head { flex-direction: column; align-items: flex-start; gap: 12px; }
   .page-head-title { font-size: 24px; }
-  .page-head-actions { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
-  .page-head-actions button, .page-head-actions .btn { flex: 1; min-width: 120px; }
-
-  /* Search + filter rows */
-  .search-filter-row { flex-wrap: wrap; gap: 8px; }
-  .search-input { min-width: 0; }
-
-  /* Form rows — stack on mobile */
   .frow { flex-direction: column; gap: 0; }
-
-  /* Lab cards */
+  .detail-body { grid-template-columns: 1fr; gap: 16px; }
   .lab-card-head { flex-wrap: wrap; gap: 10px; align-items: flex-start; }
   .lab-card-chips { flex-wrap: wrap; }
   .lab-card-actions { flex-wrap: wrap; width: 100%; margin-top: 4px; }
   .lab-action-btn { flex: 1; text-align: center; padding: 7px 8px; font-size: 11px; }
-
-  /* Outreach cards */
   .outreach-card-top { flex-wrap: wrap; gap: 8px; }
   .outreach-actions { flex-wrap: wrap; gap: 4px; }
   .outreach-action-btn { padding: 5px 10px; font-size: 11px; }
-
-  /* Version cards */
   .version-head { flex-wrap: wrap; gap: 6px; }
   .version-grid { grid-template-columns: 1fr; }
-
-  /* Modals */
   .modal-box { width: 96vw; max-width: 96vw; margin: 10px auto; padding: 20px 16px; max-height: 90vh; overflow-y: auto; }
   .modal-inner { max-height: 80vh; overflow-y: auto; }
-
-  /* Stat cards */
   .lab-stats { grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .lab-stat { padding: 12px; }
   .lab-stat-num { font-size: 28px; }
-
-  /* Image upload grid */
   .img-upload-grid { grid-template-columns: repeat(2, 1fr); }
-
-  /* Tables */
   .ing-display { font-size: 11px; }
+  .search-filter-row { flex-wrap: wrap; gap: 8px; }
+  .search-input { min-width: 0; }
 }
 </style>
 </head>
