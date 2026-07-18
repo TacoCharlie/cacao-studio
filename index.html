@@ -102,9 +102,25 @@
 
   .ps-printer-block { margin-bottom: 26px; }
   .ps-printer-block-head { font-family:'Archivo Expanded',sans-serif; font-weight:700; font-size:14px; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:8px; }
+  .ps-status-current { display:flex; align-items:flex-start; gap:10px; }
+  .ps-status-dot { width:10px; height:10px; border-radius:50%; margin-top:4px; flex-shrink:0; }
+  .ps-status-dot.printing { background: var(--heat); animation: ps-pulse 1.6s ease-in-out infinite; }
+  .ps-status-dot.idle { background: var(--muted); }
+  .ps-hprogress-track { width:100%; height:10px; background:var(--panel-2); border:1px solid var(--line); border-radius:5px; position:relative; overflow:hidden; margin:8px 0 6px; }
+  .ps-hprogress-fill { position:absolute; top:0; bottom:0; left:0; background:var(--heat); transition:width 0.3s; }
+  .ps-hprogress-fill.overdue { background:var(--danger); }
+  .ps-status-overdue-banner { margin-top:10px; padding:10px 12px; background: color-mix(in srgb, var(--danger) 22%, transparent); border:1px solid var(--danger); border-radius:4px; color: var(--danger); font-weight:700; font-size:14.5px; }
+  .ps-status-label { font-size:10px; text-transform:uppercase; letter-spacing:0.5px; color: var(--muted); font-weight:600; margin-bottom:4px; }
+  .ps-status-job { margin-top:12px; padding-top:12px; border-top:1px solid var(--line); }
+  .ps-files-panel { margin-top:8px; padding:10px; background:var(--panel-2); border:1px solid var(--line); border-radius:4px; min-width:260px; }
+  .ps-status-grid { display:grid; grid-template-columns: 1fr 170px; gap:1px; background:var(--line); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; }
+  .ps-status-left { background:var(--panel); padding:14px 16px; display:flex; flex-direction:column; justify-content:center; }
+  .ps-status-right { background:var(--line); display:flex; flex-direction:column; gap:1px; }
+  .ps-status-right .ps-summary-cell { flex:1; display:flex; flex-direction:column; justify-content:center; }
   .ps-printer-block-head .dot { width:7px; height:7px; border-radius:50%; background: var(--ok); display:inline-block; }
 
-  .ps-day { margin-bottom: 16px; }
+  .ps-day { margin-bottom: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+  .ps-day:first-child { padding-top: 0; border-top: none; }
   .ps-day-head { display:flex; align-items:baseline; gap:10px; margin-bottom:8px; }
   .ps-day-date { font-family:'Archivo Expanded',sans-serif; font-weight:700; font-size:13px; text-transform:uppercase; letter-spacing:0.3px; }
   .ps-day-meta { color: var(--muted); font-size:11px; font-family:'JetBrains Mono',monospace; }
@@ -193,6 +209,7 @@
     </div>
 
     <div class="ps-tabs">
+      <button class="ps-tab" data-tab="status">Status</button>
       <button class="ps-tab active" data-tab="schedule">Build Schedule</button>
       <button class="ps-tab" data-tab="log">Log</button>
       <button class="ps-tab" data-tab="estimate">Estimate</button>
@@ -203,6 +220,7 @@
       <button class="ps-tab" data-tab="settings">Settings</button>
     </div>
 
+    <div id="ps-tab-status" style="display:none;"></div>
     <div id="ps-tab-schedule"></div>
     <div id="ps-tab-log" style="display:none;"></div>
     <div id="ps-tab-estimate" style="display:none;"></div>
@@ -230,6 +248,24 @@ const supabaseConfigured = SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_ANON
 let sb = null;
 if(supabaseConfigured && typeof window.supabase !== 'undefined'){
   sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
+
+// ---- Project file storage (for "Open in OrcaSlicer") ----
+// Requires a public Supabase Storage bucket named 'project-files' — see
+// SUPABASE_SETUP.sql. Public read is required because OrcaSlicer's
+// orcaslicer://open?file= handler downloads the file itself, with no way
+// to attach an auth header.
+if(sb){
+  window.uploadProjectFile = async function(file, path){
+    const {error} = await sb.storage.from('project-files').upload(path, file, {upsert:true});
+    if(error) throw error;
+    const {data} = sb.storage.from('project-files').getPublicUrl(path);
+    return data.publicUrl;
+  };
+  window.deleteProjectFile = async function(path){
+    const {error} = await sb.storage.from('project-files').remove([path]);
+    if(error) throw error;
+  };
 }
 
 if(typeof window.storage === 'undefined'){
@@ -385,6 +421,15 @@ if(typeof window.storage === 'undefined'){
   };
 }
 
+// File uploads (for the "Open project in OrcaSlicer" feature) need real
+// hosting — Supabase Storage in the deployed build. There's no equivalent
+// inside a Claude artifact, so this stays null there and the Catalog tab
+// shows an explanatory message instead of a broken upload button.
+if(typeof window.uploadProjectFile === 'undefined'){
+  window.uploadProjectFile = null;
+  window.deleteProjectFile = null;
+}
+
 const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const DEFAULT_TYPES = [
   {id:'vase',   name:'Vase',        color:'#d99a3f'},
@@ -414,6 +459,7 @@ let settings = null;
 let printers = null;
 let spools = null;
 let stock = null; // unopened inventory: [{id, label, material, colorHex, weightPerSpoolG, qty}]
+let partDefs = null; // maintenance part types: [{id, name, lifespanHours, replacementLog:[{printerId,at,hoursElapsed}]}]
 let orderQty = {};
 let priorityOrder = [];
 let productionLog = [];
@@ -428,6 +474,30 @@ function todayISO(){ const d = new Date(); return d.getFullYear()+'-'+String(d.g
 async function loadState(){
   try { const c = await window.storage.get('catalog'); catalog = c ? JSON.parse(c.value) : JSON.parse(JSON.stringify(DEFAULT_CATALOG)); }
   catch(e){ catalog = JSON.parse(JSON.stringify(DEFAULT_CATALOG)); }
+  // Different printers (brands especially) often need their own slicer
+  // profile/plate setup for the "same" product — one project file per
+  // product isn't enough. Move to one file per (product, printer) pair,
+  // keyed by printer id, plus a printer-agnostic '_any' slot for a shared
+  // default. Anything already uploaded under the old single-file model
+  // becomes that default rather than being lost.
+  catalog.forEach(p => {
+    if(!p.projectFiles) p.projectFiles = {};
+    if(p.projectFileUrl){
+      p.projectFiles['_any'] = {url: p.projectFileUrl, path: p.projectFilePath || null};
+      delete p.projectFileUrl;
+      delete p.projectFilePath;
+    }
+  });
+  // A product's own timeH/timeM/weightG/projectFiles stay exactly what they
+  // were — that's the "1 unit" configuration and everything else in the app
+  // (scheduling, Estimate, Jobs) keeps assuming that unchanged. batchConfigs
+  // is purely additive: other ways of producing multiple units of this same
+  // product in a single physical print (a multi-up plate), each with its own
+  // time, weight, and project files. Only used at logging time.
+  catalog.forEach(p => { if(!Array.isArray(p.batchConfigs)) p.batchConfigs = []; });
+  catalog.forEach(p => {
+    p.batchConfigs.forEach(cfg => { if(!cfg.projectFiles) cfg.projectFiles = {}; });
+  });
 
   try { const t = await window.storage.get('types'); types = t ? JSON.parse(t.value) : JSON.parse(JSON.stringify(DEFAULT_TYPES)); }
   catch(e){ types = JSON.parse(JSON.stringify(DEFAULT_TYPES)); }
@@ -441,6 +511,7 @@ async function loadState(){
   try { const pr = await window.storage.get('printers'); printers = pr ? JSON.parse(pr.value) : JSON.parse(JSON.stringify(DEFAULT_PRINTERS)); }
   catch(e){ printers = JSON.parse(JSON.stringify(DEFAULT_PRINTERS)); }
   printers.forEach(p => { if(!('spoolId' in p)) p.spoolId = null; });
+  printers.forEach(p => { if(!('hoursResetAt' in p)) p.hoursResetAt = null; });
 
   try { const sp = await window.storage.get('spools'); spools = sp ? JSON.parse(sp.value) : JSON.parse(JSON.stringify(DEFAULT_SPOOLS)); }
   catch(e){ spools = JSON.parse(JSON.stringify(DEFAULT_SPOOLS)); }
@@ -449,6 +520,18 @@ async function loadState(){
   try { const st = await window.storage.get('stock'); stock = st ? JSON.parse(st.value) : JSON.parse(JSON.stringify(DEFAULT_STOCK)); }
   catch(e){ stock = JSON.parse(JSON.stringify(DEFAULT_STOCK)); }
   stock.forEach(st => { if(typeof st.qtyOnOrder !== 'number') st.qtyOnOrder = 0; });
+
+  try { const pd = await window.storage.get('partDefs'); partDefs = pd ? JSON.parse(pd.value) : []; }
+  catch(e){ partDefs = []; }
+  partDefs.forEach(pd => { if(!Array.isArray(pd.replacementLog)) pd.replacementLog = []; });
+  // Every printer gets an install-time entry for every part definition so
+  // its hours-since-install clock has somewhere to start counting from.
+  printers.forEach(p => {
+    if(!p.partInstalls) p.partInstalls = {};
+    partDefs.forEach(pd => {
+      if(!p.partInstalls[pd.id]) p.partInstalls[pd.id] = {installedAt: new Date().toISOString(), notified: false};
+    });
+  });
 
   try {
     const o = await window.storage.get('lastOrder');
@@ -473,6 +556,16 @@ async function loadState(){
 
   try { const lg = await window.storage.get('productionLog'); productionLog = lg ? JSON.parse(lg.value) : []; }
   catch(e){ productionLog = []; }
+  // Test prints used to always get plannedMin:0 even when tied to a real
+  // product — backfill the estimate for anything logged before that fix.
+  let backfilledTestTime = false;
+  productionLog.forEach(e => {
+    if(e.isTest && e.productId && !e.plannedMin){
+      const product = catalog.find(p=>p.id===e.productId);
+      if(product){ e.plannedMin = product.timeH*60 + product.timeM; backfilledTestTime = true; }
+    }
+  });
+  if(backfilledTestTime) saveLog();
 
   try { const ei = await window.storage.get('estimateItems'); estimateItems = ei ? JSON.parse(ei.value) : []; }
   catch(e){ estimateItems = []; }
@@ -494,6 +587,7 @@ async function loadState(){
 
   try { const jb = await window.storage.get('jobs'); jobs = jb ? JSON.parse(jb.value) : []; }
   catch(e){ jobs = []; }
+  jobs.forEach(j => { if(typeof j.manualDone !== 'number') j.manualDone = 0; });
 }
 
 async function saveJobs(){ try { await window.storage.set('jobs', JSON.stringify(jobs)); flashSave(); } catch(e){ console.error(e); } }
@@ -512,6 +606,7 @@ async function saveSettings(){ try { await window.storage.set('settings', JSON.s
 async function savePrinters(){ try { await window.storage.set('printers', JSON.stringify(printers)); flashSave(); } catch(e){ console.error(e); } }
 async function saveSpools(){ try { await window.storage.set('spools', JSON.stringify(spools)); flashSave(); } catch(e){ console.error(e); } }
 async function saveStock(){ try { await window.storage.set('stock', JSON.stringify(stock)); flashSave(); } catch(e){ console.error(e); } }
+async function savePartDefs(){ try { await window.storage.set('partDefs', JSON.stringify(partDefs)); flashSave(); } catch(e){ console.error(e); } }
 async function saveOrder(){ try { await window.storage.set('lastOrder', JSON.stringify({orderQty, priorityOrder})); flashSave(); } catch(e){ console.error(e); } }
 async function saveLog(){ try { await window.storage.set('productionLog', JSON.stringify(productionLog)); flashSave(); } catch(e){ console.error(e); } }
 // Every log entry claims exactly one unit of its product's queued quantity,
@@ -524,7 +619,7 @@ function syncConsumption(){
   productionLog.forEach(e => {
     if(!e.consumed){
       const entry = getOrderEntry(e.productId);
-      entry.qty = Math.max(0, entry.qty - 1);
+      entry.qty = Math.max(0, entry.qty - (e.unitsCompleted||1));
       e.consumed = true;
       changed = true;
     }
@@ -545,11 +640,29 @@ function syncConsumption(){
 // the queue the way a real completion does — but the filament it used is
 // genuinely gone, so that stays consumed. Locks the entry (consumed=true)
 // so syncConsumption never tries to touch it again.
-function markFailed(entryId){
+function markFailed(entryId, actualWeightG){
   const e = productionLog.find(x=>x.id===entryId);
   if(!e || e.failed) return;
   if(e.consumed){
-    getOrderEntry(e.productId).qty += 1;
+    getOrderEntry(e.productId).qty += (e.unitsCompleted||1);
+  }
+  if(e.jobCounted){
+    applyJobCredit(e, -(e.unitsCompleted||1));
+    e.jobCounted = false;
+  }
+  // Correct the spool deduction to reflect what actually got used, not the
+  // full model weight — a print that failed early shouldn't be charged as
+  // if it printed all the way through.
+  if(typeof actualWeightG === 'number'){
+    if(e.spoolConsumed && e.spoolIdAtLogTime){
+      const spool = spools.find(s=>s.id===e.spoolIdAtLogTime);
+      if(spool){
+        spool.remainingG += (e.weightGAtLogTime||0); // give back what was originally deducted
+        spool.remainingG = Math.max(0, spool.remainingG - actualWeightG); // deduct the corrected amount
+      }
+    }
+    e.weightGAtLogTime = actualWeightG;
+    saveSpools();
   }
   e.failed = true;
   if(!e.actualEnd) e.actualEnd = new Date().toISOString();
@@ -567,7 +680,22 @@ function unmarkFailed(entryId){
   saveLog();
   syncConsumption();
 }
-function getOrderEntry(id){ if(!orderQty[id]) orderQty[id] = {qty:0, pin:null}; return orderQty[id]; }
+function getOrderEntry(id){ if(!orderQty[id]) orderQty[id] = {qty:0, pin:null, batchConfigId:null}; if(!('batchConfigId' in orderQty[id])) orderQty[id].batchConfigId = null; return orderQty[id]; }
+
+// Any time a spool actually starts being used on a printer — whichever of
+// the three ways that happened (guided Change Spool, the Printers tab
+// dropdown, or the Filament tab's assignment dropdown) — stamp it, so the
+// schedule can show exactly when it happened. Doesn't re-stamp if this
+// spool is already the one marked as loaded on this printer (avoids
+// generating a new event just from re-selecting the same thing).
+function stampSpoolLoad(spoolId, printerId){
+  if(!spoolId) return;
+  const spool = spools.find(s=>s.id===spoolId);
+  if(!spool) return;
+  if(spool.loadedOnPrinterId === printerId && spool.loadedAt) return;
+  spool.loadedAt = new Date().toISOString();
+  spool.loadedOnPrinterId = printerId;
+}
 
 function renderNotifStatus(){
   const el = document.getElementById('ps-notif-status');
@@ -606,6 +734,28 @@ function checkFinishNotifications(){
   if(changed) saveLog();
 }
 
+function checkMaintenanceNotifications(){
+  if(typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  let changed = false;
+  printers.forEach(p => {
+    partDefs.forEach(pd => {
+      const install = p.partInstalls[pd.id];
+      if(!install || install.notified) return;
+      const hoursOn = printerHours(p.id, new Date(install.installedAt));
+      if(pd.lifespanHours>0 && hoursOn >= pd.lifespanHours){
+        try {
+          new Notification('Maintenance due', {
+            body: `${pd.name} on ${p.name} has reached ${fmtHours(pd.lifespanHours)} — time to inspect or replace.`
+          });
+        } catch(err){ console.error('notification failed', err); }
+        install.notified = true;
+        changed = true;
+      }
+    });
+  });
+  if(changed) savePrinters();
+}
+
 let flashTimer = null;
 function flashSave(){
   const el = document.getElementById('ps-save-note');
@@ -640,6 +790,62 @@ function fmtSpan(fromDate, toDate){
   if(hours>=24){ days += 1; hours = 0; }
   return hours>0 ? `${days}d ${hours}h` : `${days}d`;
 }
+
+// Turns a slicer-style duration string ("2h 15m 30s", "1d 2h", "45m") into
+// total whole minutes. Returns null if nothing duration-like is found.
+function parseDurationString(s){
+  const d = s.match(/(\d+)\s*d\b/i);
+  const h = s.match(/(\d+)\s*h\b/i);
+  const m = s.match(/(\d+)\s*m(?!s)\b/i); // "m" but not "ms"
+  const sec = s.match(/(\d+)\s*s\b/i);
+  if(!d && !h && !m && !sec) return null;
+  let totalMin = 0;
+  if(d) totalMin += parseInt(d[1])*24*60;
+  if(h) totalMin += parseInt(h[1])*60;
+  if(m) totalMin += parseInt(m[1]);
+  if(sec) totalMin += parseInt(sec[1])/60;
+  return Math.round(totalMin);
+}
+
+// Pulls estimated print time and filament weight out of sliced g-code
+// comments. Tries several patterns since OrcaSlicer, PrusaSlicer, Bambu
+// Studio, and Cura all phrase this slightly differently, and formats shift
+// between versions. Returns nulls for whatever it can't find rather than
+// guessing.
+function parseGcodeMetadata(text){
+  let timeMin = null, weightG = null;
+
+  const timePatterns = [
+    /estimated printing time \(normal mode\)\s*=\s*([^\n\r;]+)/i,
+    /model printing time:\s*[^\n\r;]*;\s*total estimated time:\s*([^\n\r;]+)/i,
+    /total estimated time\s*[:=]\s*([^\n\r;]+)/i,
+  ];
+  for(const re of timePatterns){
+    const m = text.match(re);
+    if(m && m[1]){
+      const parsed = parseDurationString(m[1]);
+      if(parsed != null){ timeMin = parsed; break; }
+    }
+  }
+  if(timeMin == null){
+    const m = text.match(/;\s*TIME\s*:\s*(\d+)/i); // Cura-style, seconds
+    if(m) timeMin = Math.round(parseInt(m[1])/60);
+  }
+
+  const weightPatterns = [
+    /total filament used\s*\[g\]\s*=\s*([\d.]+)/i,
+    /filament used\s*\[g\]\s*=\s*([\d.]+)/i,
+    /filament\s*weight\s*\[g\]\s*[:=]\s*([\d.]+)/i,
+    /total filament weight\s*[:=]\s*([\d.]+)\s*g/i,
+  ];
+  for(const re of weightPatterns){
+    const m = text.match(re);
+    if(m && m[1]){ weightG = parseFloat(m[1]); break; }
+  }
+
+  return {timeMin, weightG};
+}
+
 function windowBounds(date, settings){
   const [sh,sm] = settings.startTime.split(':').map(Number);
   const [eh,em] = settings.endTime.split(':').map(Number);
@@ -685,7 +891,7 @@ function fmtLogTime(iso){
   return fmtDateHead(d) + ' ' + fmtClock(d);
 }
 function productAvgActual(productId){
-  const entries = productionLog.filter(e => e.productId === productId && e.actualEnd && !e.failed);
+  const entries = productionLog.filter(e => e.productId === productId && e.actualEnd && !e.failed && !(e.unitsCompleted>1));
   if(entries.length === 0) return null;
   const totalMin = entries.reduce((s,e) => s + (new Date(e.actualEnd) - new Date(e.actualStart))/60000, 0);
   return {avgMin: totalMin/entries.length, count: entries.length};
@@ -705,7 +911,7 @@ function getActualJobsForDay(printerId, dateKey){
         : e.testLabel ? e.testLabel
         : 'untitled';
       return {
-        name: e.isTest ? ('Test: '+testDesc) : (product ? product.name : '(deleted product)'),
+        name: e.isTest ? ('Test: '+testDesc) : (product ? (e.unitsCompleted>1?e.unitsCompleted+'× ':'')+product.name : '(deleted product)'),
         type: product ? product.type : null,
         productId: e.productId,
         start: new Date(e.actualStart),
@@ -819,6 +1025,97 @@ function jobTotals(job){
   return {totalMin, totalWeight, totalUnits};
 }
 
+// There's no direct link stored between a logged print and the Job it came
+// from — once a job's items get merged into the real order they're
+// indistinguishable from anything else queued for that product. This
+// approximates the link instead: given what a printer is currently printing
+// (or about to print next), find the active job that contains that product,
+// preferring whichever was activated most recently. Progress is estimated by
+// counting non-failed logged prints of that job's products, across every
+// printer, logged since the job went active.
+function findActiveJobForProduct(productId){
+  if(!productId) return null;
+  const candidates = jobs.filter(j => j.status==='active' && j.items.some(it=>it.id===productId));
+  if(candidates.length===0) return null;
+  candidates.sort((a,b) => new Date(b.activatedAt||b.createdAt) - new Date(a.activatedAt||a.createdAt));
+  return candidates[0];
+}
+// Job progress is a plain number you set yourself — job.manualDone. No
+// inference from log timing. The previous approach tried to guess which
+// logged prints belonged to which job based on when they happened, and that
+// guess kept being wrong against real, messy production timelines. This
+// can't be wrong because nothing is being inferred.
+function jobProgress(job){
+  const {totalUnits} = jobTotals(job);
+  const done = Math.max(0, job.manualDone||0);
+  return {done: Math.min(done, totalUnits), totalUnits};
+}
+
+// Total time a printer has actually spent running, in hours. Counts failed
+// and test prints too — the motors and hotend were on regardless of whether
+// the print succeeded or was ever meant to ship, so this is closer to a real
+// wear/maintenance odometer than a "successful prints only" figure. Only
+// counts entries that have actually finished (or failed and were closed
+// out) — an entry still mid-print isn't counted until it wraps up.
+function printerHours(printerId, sinceDate){
+  const entries = productionLog.filter(e => e.printerId === printerId && e.actualEnd);
+  let since = sinceDate;
+  if(since){
+    // Logged start times only have minute precision — floor the reset point
+    // to the minute too, or a print logged in the same minute as the reset
+    // gets wrongly excluded.
+    since = new Date(since.getFullYear(), since.getMonth(), since.getDate(), since.getHours(), since.getMinutes(), 0, 0);
+  }
+  const filtered = since ? entries.filter(e => new Date(e.actualStart) >= since) : entries;
+  const totalMs = filtered.reduce((sum,e) => sum + (new Date(e.actualEnd) - new Date(e.actualStart)), 0);
+  return totalMs / 3600000;
+}
+function fmtHours(h){
+  if(h < 10) return h.toFixed(1)+'h';
+  return Math.round(h)+'h';
+}
+
+// Logs a maintenance part replacement on a printer: records how many hours
+// that instance actually lasted, folds that into the part's running average
+// (so the lifespan estimate self-corrects toward reality — an early failure
+// pulls the estimate down, a part that outlasted expectations pulls it up),
+// and resets that printer's clock for the part to zero.
+// Applies (or reverses, with a negative delta) job credit for a log entry
+// that has an explicit jobId — never inferred, always whatever the user
+// actually picked when logging. entry.jobCounted tracks whether this
+// specific entry's credit is currently applied, so it can't be double-
+// counted across the several places a print can transition to "done".
+function applyJobCredit(entry, delta){
+  if(!entry.jobId) return;
+  const job = jobs.find(j=>j.id===entry.jobId);
+  if(!job) return;
+  const {totalUnits} = jobTotals(job);
+  job.manualDone = Math.max(0, Math.min(totalUnits, (job.manualDone||0) + delta));
+  saveJobs();
+}
+function creditJobIfDue(entry){
+  if(entry.jobId && !entry.jobCounted && entry.actualEnd && !entry.failed){
+    applyJobCredit(entry, entry.unitsCompleted||1);
+    entry.jobCounted = true;
+  }
+}
+
+function logPartReplacement(printerId, partDefId){
+  const partDef = partDefs.find(pd => pd.id === partDefId);
+  const printer = printers.find(p => p.id === printerId);
+  if(!partDef || !printer || !printer.partInstalls[partDefId]) return;
+  const installedAt = new Date(printer.partInstalls[partDefId].installedAt);
+  const hoursElapsed = printerHours(printerId, installedAt);
+  partDef.replacementLog.push({printerId, at: new Date().toISOString(), hoursElapsed});
+  const intervals = partDef.replacementLog.map(r => r.hoursElapsed).filter(h => h > 0);
+  if(intervals.length > 0){
+    partDef.lifespanHours = intervals.reduce((s,h) => s+h, 0) / intervals.length;
+  }
+  printer.partInstalls[partDefId] = {installedAt: new Date().toISOString(), notified: false};
+  savePartDefs(); savePrinters();
+}
+
+
 function renderJobItemRows(job, editable){
   return job.items.map((item, idx) => {
     const p = catalog.find(x=>x.id===item.id);
@@ -880,6 +1177,9 @@ function renderJobs(){
 
   const activeCards = active.map(job => {
     const t = jobTotals(job);
+    const {done, totalUnits} = jobProgress(job);
+    const pct = totalUnits>0 ? Math.min(100, (done/totalUnits)*100) : 0;
+    const isEditing = editingJobId === job.id;
     return `
       <div class="ps-printer-card" data-jobid="${job.id}">
         <div class="ps-printer-top">
@@ -888,6 +1188,20 @@ function renderJobs(){
           <button class="ps-btn small" data-action="job-done">Mark Done</button>
           <button class="ps-btn ghost small" data-action="job-delete">✕</button>
         </div>
+        <div class="ps-hprogress-track" style="margin-bottom:4px;"><div class="ps-hprogress-fill" style="width:${pct}%;"></div></div>
+        ${isEditing ? `
+        <div class="ps-row" style="margin-bottom:8px;gap:6px;">
+          <input class="ps-input ps-narrow" type="number" min="0" max="${totalUnits}" id="ps-job-edit-input" value="${done}" style="width:70px;" />
+          <span class="ps-hint">of ${totalUnits} unit${totalUnits!==1?'s':''} done</span>
+          <button class="ps-btn primary small" data-action="job-edit-save">Save</button>
+          <button class="ps-btn ghost small" data-action="job-edit-cancel">Cancel</button>
+        </div>
+        ` : `
+        <div class="ps-row" style="margin-bottom:8px;gap:6px;">
+          <span class="ps-hint">${done} of ${totalUnits} unit${totalUnits!==1?'s':''} done</span>
+          <button class="ps-btn ghost small" data-action="job-edit-start">Edit</button>
+        </div>
+        `}
         <div class="ps-joblist">${renderJobItemRows(job, false)}</div>
       </div>
     `;
@@ -948,6 +1262,8 @@ function renderJobs(){
           entry.qty += item.qty;
         });
         job.status = 'active';
+        job.activatedAt = new Date().toISOString();
+        job.activatedAt = new Date().toISOString();
         saveOrder(); saveJobs();
         renderJobs(); regenerateIfActive();
       });
@@ -957,6 +1273,30 @@ function renderJobs(){
       doneBtn.addEventListener('click', () => {
         job.status = 'done';
         saveJobs(); renderJobs();
+      });
+    }
+    const editStartBtn = card.querySelector('[data-action="job-edit-start"]');
+    if(editStartBtn){
+      editStartBtn.addEventListener('click', () => {
+        editingJobId = job.id;
+        renderJobs();
+      });
+    }
+    const editSaveBtn = card.querySelector('[data-action="job-edit-save"]');
+    if(editSaveBtn){
+      editSaveBtn.addEventListener('click', () => {
+        const {totalUnits} = jobTotals(job);
+        const input = document.getElementById('ps-job-edit-input');
+        job.manualDone = Math.max(0, Math.min(totalUnits, parseInt(input.value)||0));
+        editingJobId = null;
+        saveJobs(); renderJobs();
+      });
+    }
+    const editCancelBtn = card.querySelector('[data-action="job-edit-cancel"]');
+    if(editCancelBtn){
+      editCancelBtn.addEventListener('click', () => {
+        editingJobId = null;
+        renderJobs();
       });
     }
     const deleteBtn = card.querySelector('[data-action="job-delete"]');
@@ -1010,13 +1350,136 @@ function renderJobs(){
   const newJobBtn = document.getElementById('ps-job-new');
   if(newJobBtn){
     newJobBtn.addEventListener('click', () => {
-      jobs.push({id: uid('job'), name: 'New job', items: [], status:'queued', createdAt: new Date().toISOString()});
+      jobs.push({id: uid('job'), name: 'New job', items: [], status:'queued', createdAt: new Date().toISOString(), manualDone: 0});
       saveJobs(); renderJobs();
     });
   }
 }
 
 let changeSpoolOpenFor = new Set(); // session-only: which printer cards have the Change Spool picker open
+
+// ---------- rendering: Status tab ----------
+function renderStatus(){
+  const root = document.getElementById('ps-tab-status');
+  if(!root) return;
+  const activePrinters = printers.filter(p => p.status === 'active');
+  const now = new Date();
+
+  if(activePrinters.length === 0){
+    root.innerHTML = `<div class="ps-panel"><div class="ps-empty">No active printers — check the Printers tab.</div></div>`;
+    return;
+  }
+
+  const liveMachines = liveSchedule ? liveSchedule.machines : [];
+
+  const cards = activePrinters.map(p => {
+    const inProgress = productionLog
+      .filter(e => e.printerId === p.id && !e.actualEnd && !e.failed)
+      .sort((a,b) => new Date(b.actualStart) - new Date(a.actualStart))[0];
+
+    const spool = p.spoolId ? spools.find(s => s.id === p.spoolId && !s.retired) : null;
+    const spoolLow = spool && spool.remainingG <= LOW_STOCK_G;
+    const spoolPct = spool && spool.totalG>0 ? Math.max(0, Math.min(100, ((spool.totalG-spool.remainingG)/spool.totalG)*100)) : 0;
+
+    let leftSide, overdueBanner = '', timeCell, subLine, relevantProductId = null;
+
+    if(inProgress){
+      const product = catalog.find(x=>x.id===inProgress.productId);
+      relevantProductId = inProgress.productId;
+      const name = inProgress.isTest
+        ? 'Test: ' + (product && inProgress.testLabel ? `${product.name} — ${inProgress.testLabel}` : product ? product.name : (inProgress.testLabel||'untitled'))
+        : (product ? (inProgress.unitsCompleted>1?inProgress.unitsCompleted+'× ':'')+product.name : '(deleted product)');
+      const estFinish = new Date(new Date(inProgress.actualStart).getTime() + (inProgress.plannedMin||0)*60000);
+      const elapsedMin = Math.max(0, (now - new Date(inProgress.actualStart))/60000);
+      const overdue = now > estFinish;
+      const progressPct = inProgress.plannedMin>0 ? Math.min(100, (elapsedMin/inProgress.plannedMin)*100) : 0;
+
+      if(inProgress.plannedMin>0 && overdue){
+        timeCell = `<div class="ps-summary-cell"><div class="ps-summary-label" style="margin:0 0 4px;">TIME REMAINING</div><div class="ps-summary-num" style="color:var(--danger);">OVERDUE</div><div class="ps-summary-label">was due ${fmtClock(estFinish)}</div></div>`;
+        overdueBanner = `<div class="ps-status-overdue-banner">⚠ Should be done by now — go check it</div>`;
+      } else if(inProgress.plannedMin>0){
+        const remainingMin = Math.max(0, inProgress.plannedMin - elapsedMin);
+        timeCell = `<div class="ps-summary-cell"><div class="ps-summary-label" style="margin:0 0 4px;">TIME REMAINING</div><div class="ps-summary-num">${fmtDuration(remainingMin)}</div><div class="ps-summary-label">done ${fmtClock(estFinish)}</div></div>`;
+      } else {
+        timeCell = `<div class="ps-summary-cell"><div class="ps-summary-label" style="margin:0 0 4px;">TIME ELAPSED</div><div class="ps-summary-num">${fmtDuration(elapsedMin)}</div><div class="ps-summary-label">no estimate available</div></div>`;
+      }
+
+      leftSide = `
+        <div class="ps-status-label">CURRENTLY PRINTING</div>
+        <div style="font-size:19px;font-weight:700;line-height:1.25;">${escapeHtml(name)}</div>
+        <div class="ps-hprogress-track" title="${Math.round(progressPct)}% of estimated time elapsed">
+          <div class="ps-hprogress-fill ${overdue?'overdue':''}" style="width:${progressPct}%;"></div>
+        </div>
+        <div class="ps-hint mono">started ${fmtClock(new Date(inProgress.actualStart))} · ${Math.round(progressPct)}% of estimated time</div>
+      `;
+    } else {
+      timeCell = `<div class="ps-summary-cell"><div class="ps-summary-label" style="margin:0 0 4px;">TIME REMAINING</div><div class="ps-summary-num" style="color:var(--muted);">—</div><div class="ps-summary-label">not printing</div></div>`;
+      leftSide = `
+        <div class="ps-status-label">CURRENTLY PRINTING</div>
+        <div style="font-size:19px;font-weight:700;color:var(--muted);">Idle</div>
+        <div class="ps-hprogress-track" style="opacity:0.35;"><div class="ps-hprogress-fill" style="width:0%;"></div></div>
+        <div class="ps-hint">Nothing running on this printer right now.</div>
+      `;
+    }
+
+    const filamentCell = spool
+      ? `<div class="ps-summary-cell"><div class="ps-summary-label" style="margin:0 0 4px;">FILAMENT LEFT</div><div class="ps-summary-num" style="${spoolLow?'color:var(--danger);':''}">${spool.remainingG}g</div><div class="ps-spool-bar-track" style="margin:6px 0 4px;"><div class="ps-spool-bar-fill ${spoolLow?'low':''}" style="width:${spoolPct}%"></div></div><div class="ps-summary-label" style="text-transform:none;letter-spacing:0;">${spoolLow?'low — ':''}${escapeHtml(spool.label)}</div></div>`
+      : `<div class="ps-summary-cell"><div class="ps-summary-label" style="margin:0 0 4px;">FILAMENT LEFT</div><div class="ps-summary-num" style="color:var(--muted);">—</div><div class="ps-summary-label">no spool set</div></div>`;
+
+    const machine = liveMachines.find(m => m.id === p.id);
+    let upcoming = null;
+    if(machine){
+      upcoming = machine.days
+        .flatMap(d => d.jobs)
+        .filter(j => j.start > now)
+        .sort((a,b) => a.start - b.start)[0];
+      subLine = upcoming
+        ? `Next: <b style="color:var(--text);">${escapeHtml(upcoming.name)}</b> — ${fmtDateHead(upcoming.start)} ${fmtClock(upcoming.start)}`
+        : `Nothing queued after this.`;
+    } else {
+      subLine = `No schedule generated yet — check the Build Schedule tab.`;
+    }
+
+    // Job status: which active Job (from the Jobs tab) this printer's
+    // current-or-next product belongs to, if any, and how far along that
+    // job is overall (not just on this printer).
+    if(!relevantProductId && upcoming) relevantProductId = upcoming.productId;
+    const job = findActiveJobForProduct(relevantProductId);
+    let jobSection = '';
+    if(job){
+      const {done, totalUnits} = jobProgress(job);
+      const pct = totalUnits>0 ? Math.min(100, (done/totalUnits)*100) : 0;
+      jobSection = `
+        <div class="ps-status-job">
+          <div class="ps-status-label">JOB</div>
+          <div style="font-weight:700;">${escapeHtml(job.name)}</div>
+          <div class="ps-hprogress-track"><div class="ps-hprogress-fill" style="width:${pct}%;background:var(--ok);"></div></div>
+          <div class="ps-hint">${done} of ${totalUnits} units done</div>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="ps-panel">
+        <div class="ps-printer-block-head" style="margin-bottom:12px;"><span class="dot"></span>${escapeHtml(p.name)}</div>
+        <div class="ps-status-grid">
+          <div class="ps-status-left">
+            ${leftSide}
+          </div>
+          <div class="ps-status-right">
+            ${timeCell}
+            ${filamentCell}
+          </div>
+        </div>
+        ${overdueBanner}
+        ${jobSection}
+        <div style="margin-top:12px;font-size:13.5px;">${subLine}</div>
+      </div>
+    `;
+  }).join('');
+
+  root.innerHTML = cards;
+}
 
 function renderPrinters(){
   const root = document.getElementById('ps-tab-printers');
@@ -1060,11 +1523,61 @@ function renderPrinters(){
           <div class="ps-hint">Used to flag when the schedule will run this machine out of filament.</div>
           ${changePicker}
         </div>
+        <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line);">
+          <div class="ps-row" style="justify-content:space-between;flex-wrap:wrap;gap:8px;">
+            <div class="ps-hint">Lifetime: <b style="color:var(--text);">${fmtHours(printerHours(p.id))}</b>${p.hoursResetAt ? ` · since reset: <b style="color:var(--text);">${fmtHours(printerHours(p.id, new Date(p.hoursResetAt)))}</b> (${fmtDateHead(new Date(p.hoursResetAt))})` : ''}</div>
+            <button class="ps-btn ghost small" data-action="reset-hours">Reset hours counter</button>
+          </div>
+        </div>
+        ${partDefs.length>0 ? `
+        <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line);">
+          <div class="ps-status-label" style="margin-bottom:8px;">MAINTENANCE PARTS</div>
+          ${partDefs.map(pd => {
+            const install = p.partInstalls[pd.id];
+            const hoursOn = install ? printerHours(p.id, new Date(install.installedAt)) : 0;
+            const pct = pd.lifespanHours>0 ? Math.min(100, (hoursOn/pd.lifespanHours)*100) : 0;
+            const due = pd.lifespanHours>0 && hoursOn >= pd.lifespanHours;
+            return `
+              <div style="margin-bottom:10px;">
+                <div class="ps-row" style="justify-content:space-between;">
+                  <span class="ps-hint">${escapeHtml(pd.name)} — <b style="color:${due?'var(--danger)':'var(--text)'};">${fmtHours(hoursOn)}</b> / ${fmtHours(pd.lifespanHours)}${due ? ' <span style="color:var(--danger);font-weight:700;">— inspect/replace</span>' : ''}</span>
+                  <button class="ps-btn ghost small" data-action="log-part-replacement" data-partid="${pd.id}">Log Replacement</button>
+                </div>
+                <div class="ps-hprogress-track" style="height:6px;margin:4px 0 0;"><div class="ps-hprogress-fill ${due?'overdue':''}" style="width:${pct}%;"></div></div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+        ` : ''}
       </div>
     `;
   }).join('');
 
+  const partDefRows = partDefs.map(pd => `
+    <tr data-id="${pd.id}">
+      <td><input class="ps-input ps-name" data-field="name" value="${escapeHtml(pd.name)}" /></td>
+      <td><input class="ps-input ps-narrow" type="number" min="1" data-field="lifespanHours" value="${Math.round(pd.lifespanHours)}" style="width:90px;" /></td>
+      <td class="ps-hint">${pd.replacementLog.length} logged</td>
+      <td><button class="ps-btn ghost small" data-action="remove-part">✕</button></td>
+    </tr>
+  `).join('');
+
   root.innerHTML = `
+    <div class="ps-panel">
+      <div class="ps-panel-title"><span class="dot"></span>Maintenance Parts</div>
+      <div class="ps-hint" style="margin-bottom:12px;">Define a part type once — every printer tracks its own hours-since-install independently. Lifespan starts as your estimate and adjusts on its own as you log real replacements.</div>
+      ${partDefs.length===0 ? '<div class="ps-empty">No parts tracked yet — add one below, e.g. "Hotend" at 1000 hours.</div>' : `
+      <div style="overflow-x:auto;">
+      <table class="ps-table">
+        <thead><tr><th>Part</th><th style="width:110px">Lifespan (h)</th><th style="width:100px">History</th><th></th></tr></thead>
+        <tbody id="ps-parts-body">${partDefRows}</tbody>
+      </table>
+      </div>
+      `}
+      <div style="margin-top:14px;">
+        <button class="ps-btn" id="ps-add-part">+ Add part</button>
+      </div>
+    </div>
     <div class="ps-panel">
       <div class="ps-panel-title"><span class="dot"></span>Printers</div>
       <div id="ps-printers-list">${cards}</div>
@@ -1074,6 +1587,33 @@ function renderPrinters(){
       <div class="ps-hint" style="margin-top:12px;">Mark a printer "Down" to pull it out of the rotation entirely — its share of the queue gets redistributed to the active printers. To tell the Live Schedule what a printer's actually doing right now, log its prints on the Log tab. Use "Change Spool" when you actually swap the physical spool — it retires the old one and pulls a fresh one from Stock.</div>
     </div>
   `;
+
+  root.querySelectorAll('#ps-parts-body tr').forEach(tr => {
+    const pid = tr.getAttribute('data-id');
+    tr.querySelectorAll('[data-field]').forEach(input => {
+      input.addEventListener('change', () => {
+        const pd = partDefs.find(x=>x.id===pid);
+        const field = input.getAttribute('data-field');
+        if(field==='lifespanHours'){
+          pd.lifespanHours = Math.max(1, parseFloat(input.value)||1);
+        } else {
+          pd[field] = input.value;
+        }
+        savePartDefs(); renderPrinters(); regenerateIfActive();
+      });
+    });
+    tr.querySelector('[data-action="remove-part"]').addEventListener('click', () => {
+      partDefs = partDefs.filter(x=>x.id!==pid);
+      printers.forEach(p => { delete p.partInstalls[pid]; });
+      savePartDefs(); savePrinters(); renderPrinters();
+    });
+  });
+  document.getElementById('ps-add-part').addEventListener('click', () => {
+    const newId = uid('part');
+    partDefs.push({id:newId, name:'New part', lifespanHours:1000, replacementLog:[]});
+    printers.forEach(p => { p.partInstalls[newId] = {installedAt: new Date().toISOString(), notified:false}; });
+    savePartDefs(); savePrinters(); renderPrinters();
+  });
 
   root.querySelectorAll('.ps-printer-card').forEach(card => {
     const id = card.getAttribute('data-id');
@@ -1089,6 +1629,7 @@ function renderPrinters(){
     card.querySelector('[data-field="spoolId"]').addEventListener('change', e => {
       const p = printers.find(x=>x.id===id);
       p.spoolId = e.target.value || null;
+      if(p.spoolId){ stampSpoolLoad(p.spoolId, p.id); saveSpools(); }
       savePrinters(); regenerateIfActive();
     });
     card.querySelector('[data-action="remove"]').addEventListener('click', () => {
@@ -1099,6 +1640,18 @@ function renderPrinters(){
       if(changeSpoolOpenFor.has(id)) changeSpoolOpenFor.delete(id);
       else changeSpoolOpenFor.add(id);
       renderPrinters();
+    });
+    card.querySelector('[data-action="reset-hours"]').addEventListener('click', () => {
+      const p = printers.find(x=>x.id===id);
+      p.hoursResetAt = new Date().toISOString();
+      savePrinters(); renderPrinters();
+    });
+    card.querySelectorAll('[data-action="log-part-replacement"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const partId = btn.getAttribute('data-partid');
+        logPartReplacement(id, partId);
+        renderPrinters();
+      });
     });
     const cancelBtn = card.querySelector('[data-action="cancel-change-spool"]');
     if(cancelBtn){
@@ -1123,7 +1676,8 @@ function renderPrinters(){
         st.qty -= 1;
         const newSpool = {
           id: uid('spool'), label: st.label, material: st.material, colorHex: st.colorHex,
-          totalG: st.weightPerSpoolG, remainingG: st.weightPerSpoolG, retired: false
+          totalG: st.weightPerSpoolG, remainingG: st.weightPerSpoolG, retired: false,
+          loadedAt: new Date().toISOString(), loadedOnPrinterId: id
         };
         spools.push(newSpool);
         p.spoolId = newSpool.id;
@@ -1136,13 +1690,17 @@ function renderPrinters(){
   });
 
   document.getElementById('ps-add-printer').addEventListener('click', () => {
-    printers.push({id: uid('printer'), name: 'New printer', status:'active', spoolId:null});
+    const newPartInstalls = {};
+    partDefs.forEach(pd => { newPartInstalls[pd.id] = {installedAt: new Date().toISOString(), notified:false}; });
+    printers.push({id: uid('printer'), name: 'New printer', status:'active', spoolId:null, partInstalls: newPartInstalls});
     savePrinters(); renderPrinters(); regenerateIfActive();
   });
 }
 
 // ---------- rendering: Log tab ----------
 let editingLogId = null;
+let editingJobId = null; // which active job's "units done" is showing the edit form
+let failingLogId = null; // which entry is showing the "confirm failed — how much filament?" prompt
 // Which past days/weeks a person has manually expanded, keyed by
 // "machineId|dateKey" or "machineId|weekStartDateKey". Session-only — not
 // persisted, and not relevant for Theoretical view (no "past" there since
@@ -1168,6 +1726,29 @@ function renderLog(){
   const rows = entries.map(e => {
     const printer = printers.find(p=>p.id===e.printerId);
     const product = catalog.find(p=>p.id===e.productId);
+
+    if(e.id === failingLogId){
+      const elapsedMin = Math.max(0, ((e.actualEnd ? new Date(e.actualEnd) : new Date()) - new Date(e.actualStart))/60000);
+      const fullWeight = e.weightGAtLogTime || 0;
+      const estimate = (e.plannedMin>0 && fullWeight>0)
+        ? Math.round(Math.min(1, elapsedMin/e.plannedMin) * fullWeight)
+        : fullWeight;
+      return `
+        <div class="ps-log-entry" data-id="${e.id}">
+          <div style="width:100%;">
+            <div class="ps-hint" style="margin-bottom:8px;">Marking <b style="color:var(--text);">${escapeHtml(product?product.name:'(deleted product)')}</b> failed — how much filament actually got used before it died? Full model weight is ${fullWeight}g; a rough time-based guess is prefilled below.</div>
+            <div class="ps-row" style="align-items:flex-end;">
+              <div class="ps-field" style="margin-bottom:0;">
+                <span class="ps-field-label">Filament actually used (g)</span>
+                <input class="ps-input ps-narrow" style="width:90px;" type="number" min="0" id="ps-fail-weight-${e.id}" value="${estimate}" />
+              </div>
+              <button class="ps-btn primary small" data-action="confirm-fail">Confirm Failed</button>
+              <button class="ps-btn ghost small" data-action="cancel-fail">Cancel</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
 
     if(e.id === editingLogId){
       const pOpts = printers.map(p => `<option value="${p.id}" ${p.id===e.printerId?'selected':''}>${escapeHtml(p.name)}${p.status==='down'?' (down)':''}</option>`).join('');
@@ -1212,7 +1793,7 @@ function renderLog(){
         : e.testLabel ? escapeHtml(e.testLabel)
         : '(untitled test)')
       : null;
-    const titleText = e.isTest ? `<span class="ps-hint" style="text-transform:uppercase;font-weight:700;letter-spacing:0.4px;">Test</span> ${testDesc}` : escapeHtml(product?product.name:'(deleted product)');
+    const titleText = e.isTest ? `<span class="ps-hint" style="text-transform:uppercase;font-weight:700;letter-spacing:0.4px;">Test</span> ${testDesc}` : `${e.unitsCompleted>1?e.unitsCompleted+'× ':''}${escapeHtml(product?product.name:'(deleted product)')}`;
     return `
       <div class="ps-log-entry ${e.failed?'ps-log-failed':''}" data-id="${e.id}">
         <div>
@@ -1264,6 +1845,14 @@ function renderLog(){
           <span class="ps-field-label">Product</span>
           <select class="ps-select" id="ps-log-product">${productOptions}</select>
         </div>
+        <div class="ps-field" id="ps-log-batch-field" style="flex:1;min-width:160px;margin-bottom:0;">
+          <span class="ps-field-label">Batch</span>
+          <select class="ps-select" id="ps-log-batch"></select>
+        </div>
+        <div class="ps-field" id="ps-log-job-field" style="flex:1;min-width:160px;margin-bottom:0;">
+          <span class="ps-field-label">Job</span>
+          <select class="ps-select" id="ps-log-job"></select>
+        </div>
         <div class="ps-field" id="ps-log-testproduct-field" style="flex:1;min-width:160px;margin-bottom:0;display:none;">
           <span class="ps-field-label">Product (optional)</span>
           <select class="ps-select" id="ps-log-testproduct">
@@ -1303,10 +1892,41 @@ function renderLog(){
   testCheckbox.addEventListener('change', () => {
     const isTest = testCheckbox.checked;
     document.getElementById('ps-log-product-field').style.display = isTest ? 'none' : '';
+    document.getElementById('ps-log-batch-field').style.display = isTest ? 'none' : '';
+    document.getElementById('ps-log-job-field').style.display = isTest ? 'none' : '';
     document.getElementById('ps-log-testproduct-field').style.display = isTest ? '' : 'none';
     document.getElementById('ps-log-testlabel-field').style.display = isTest ? '' : 'none';
     document.getElementById('ps-log-testweight-field').style.display = isTest ? '' : 'none';
   });
+
+  function refreshBatchOptions(){
+    const product = catalog.find(x=>x.id===document.getElementById('ps-log-product').value);
+    const batchSelect = document.getElementById('ps-log-batch');
+    if(!product){ batchSelect.innerHTML = ''; return; }
+    const options = [`<option value="">Single unit — ${fmtDuration(product.timeH*60+product.timeM)}${product.weightG>0?', '+product.weightG+'g':''}</option>`];
+    product.batchConfigs.forEach(cfg => {
+      options.push(`<option value="${cfg.id}">${cfg.unitsPerBatch}× batch — ${fmtDuration(cfg.timeH*60+cfg.timeM)}${cfg.weightG>0?', '+cfg.weightG+'g':''}</option>`);
+    });
+    batchSelect.innerHTML = options.join('');
+  }
+  refreshBatchOptions();
+  document.getElementById('ps-log-product').addEventListener('change', refreshBatchOptions);
+
+  function refreshJobOptions(){
+    const productId = document.getElementById('ps-log-product').value;
+    const jobSelect = document.getElementById('ps-log-job');
+    const candidates = jobs.filter(j => j.status==='active' && j.items.some(it=>it.id===productId));
+    const options = [`<option value="">— no job —</option>`];
+    candidates.forEach(j => { options.push(`<option value="${j.id}">${escapeHtml(j.name)}</option>`); });
+    jobSelect.innerHTML = options.join('');
+    // Zero extra clicks in the common case — if exactly one active job wants
+    // this product, pre-select it. Still fully visible and changeable, never
+    // hidden or silently applied.
+    if(candidates.length===1) jobSelect.value = candidates[0].id;
+  }
+  refreshJobOptions();
+  document.getElementById('ps-log-product').addEventListener('change', refreshJobOptions);
+
   const testProductSelect = document.getElementById('ps-log-testproduct');
   testProductSelect.addEventListener('change', () => {
     const p = catalog.find(x=>x.id===testProductSelect.value);
@@ -1327,12 +1947,14 @@ function renderLog(){
       const testLabel = document.getElementById('ps-log-testlabel').value.trim();
       const testWeight = Math.max(0, parseFloat(document.getElementById('ps-log-testweight').value)||0);
       if(!printerId || (!testProductId && !testLabel) || !startVal) return;
+      const testProduct = testProductId ? catalog.find(p=>p.id===testProductId) : null;
+      const testPlannedMin = testProduct ? (testProduct.timeH*60+testProduct.timeM) : 0;
       productionLog.push({
         id: uid('log'),
         printerId, productId: testProductId, isTest: true, testLabel,
         actualStart: new Date(startVal).toISOString(),
         actualEnd: endVal ? new Date(endVal).toISOString() : null,
-        plannedMin: 0,
+        plannedMin: testPlannedMin,
         weightGAtLogTime: testWeight,
         spoolIdAtLogTime: printer ? (printer.spoolId||null) : null,
         consumed: true // no order impact regardless of whether a product is tied to it
@@ -1341,16 +1963,26 @@ function renderLog(){
       const productId = document.getElementById('ps-log-product').value;
       if(!printerId || !productId || !startVal) return;
       const product = catalog.find(p=>p.id===productId);
-      const plannedMin = product ? (product.timeH*60+product.timeM) : 0;
-      productionLog.push({
+      const batchConfigId = document.getElementById('ps-log-batch').value || null;
+      const batchConfig = batchConfigId && product ? product.batchConfigs.find(c=>c.id===batchConfigId) : null;
+      const plannedMin = batchConfig ? (batchConfig.timeH*60+batchConfig.timeM) : (product ? (product.timeH*60+product.timeM) : 0);
+      const weightAtLog = batchConfig ? (batchConfig.weightG||0) : (product ? (product.weightG||0) : 0);
+      const unitsCompleted = batchConfig ? batchConfig.unitsPerBatch : 1;
+      const selectedJobId = document.getElementById('ps-log-job').value || null;
+      const newEntry = {
         id: uid('log'),
         printerId, productId,
         actualStart: new Date(startVal).toISOString(),
         actualEnd: endVal ? new Date(endVal).toISOString() : null,
         plannedMin,
-        weightGAtLogTime: product ? (product.weightG||0) : 0,
-        spoolIdAtLogTime: printer ? (printer.spoolId||null) : null
-      });
+        weightGAtLogTime: weightAtLog,
+        spoolIdAtLogTime: printer ? (printer.spoolId||null) : null,
+        unitsCompleted,
+        jobId: selectedJobId,
+        jobCounted: false
+      };
+      creditJobIfDue(newEntry);
+      productionLog.push(newEntry);
     }
     // Logging a print permanently claims one unit from the queue — it doesn't
     // come back on its own the next day. Deleting or re-pointing this entry
@@ -1381,7 +2013,7 @@ function renderLog(){
           // This entry no longer claims a unit of the old product — give it
           // back if it had actually been claimed — then let syncConsumption
           // claim one of the new product below.
-          if(e.consumed){ getOrderEntry(e.productId).qty += 1; }
+          if(e.consumed){ getOrderEntry(e.productId).qty += (e.unitsCompleted||1); }
           e.consumed = false;
         } else if(productChanged && e.failed){
           const product = catalog.find(p=>p.id===productId);
@@ -1407,6 +2039,7 @@ function renderLog(){
         e.actualStart = new Date(startVal).toISOString();
         e.notifiedFinishSoon = false;
         e.actualEnd = endVal ? new Date(endVal).toISOString() : null;
+        creditJobIfDue(e);
         editingLogId = null;
         syncConsumption();
         renderLog(); regenerateIfActive();
@@ -1423,14 +2056,32 @@ function renderLog(){
       finishBtn.addEventListener('click', () => {
         const e = productionLog.find(x=>x.id===id);
         e.actualEnd = new Date().toISOString();
+        creditJobIfDue(e);
         saveLog(); renderLog(); regenerateIfActive();
       });
     }
     const failBtn = row.querySelector('[data-action="fail"]');
     if(failBtn){
       failBtn.addEventListener('click', () => {
-        markFailed(id);
+        failingLogId = id;
+        renderLog();
+      });
+    }
+    const confirmFailBtn = row.querySelector('[data-action="confirm-fail"]');
+    if(confirmFailBtn){
+      confirmFailBtn.addEventListener('click', () => {
+        const weightInput = document.getElementById('ps-fail-weight-'+id);
+        const actualWeightG = Math.max(0, parseFloat(weightInput.value)||0);
+        markFailed(id, actualWeightG);
+        failingLogId = null;
         renderLog(); regenerateIfActive();
+      });
+    }
+    const cancelFailBtn = row.querySelector('[data-action="cancel-fail"]');
+    if(cancelFailBtn){
+      cancelFailBtn.addEventListener('click', () => {
+        failingLogId = null;
+        renderLog();
       });
     }
     const unfailBtn = row.querySelector('[data-action="unfail"]');
@@ -1447,20 +2098,26 @@ function renderLog(){
         renderLog();
       });
     }
-    row.querySelector('[data-action="delete"]').addEventListener('click', () => {
-      const removed = productionLog.find(x=>x.id===id);
-      productionLog = productionLog.filter(x=>x.id!==id);
-      if(removed && removed.consumed && !removed.failed && removed.productId){
-        const orderEntry = getOrderEntry(removed.productId);
-        orderEntry.qty += 1;
-        saveOrder();
-      }
-      if(removed && removed.spoolConsumed && removed.spoolIdAtLogTime){
-        const spool = spools.find(s=>s.id===removed.spoolIdAtLogTime);
-        if(spool){ spool.remainingG += (removed.weightGAtLogTime||0); saveSpools(); }
-      }
-      saveLog(); renderLog(); regenerateIfActive();
-    });
+    const deleteBtn = row.querySelector('[data-action="delete"]');
+    if(deleteBtn){
+      deleteBtn.addEventListener('click', () => {
+        const removed = productionLog.find(x=>x.id===id);
+        productionLog = productionLog.filter(x=>x.id!==id);
+        if(removed && removed.consumed && !removed.failed && removed.productId){
+          const orderEntry = getOrderEntry(removed.productId);
+          orderEntry.qty += (removed.unitsCompleted||1);
+          saveOrder();
+        }
+        if(removed && removed.spoolConsumed && removed.spoolIdAtLogTime){
+          const spool = spools.find(s=>s.id===removed.spoolIdAtLogTime);
+          if(spool){ spool.remainingG += (removed.weightGAtLogTime||0); saveSpools(); }
+        }
+        if(removed && removed.jobCounted){
+          applyJobCredit(removed, -(removed.unitsCompleted||1));
+        }
+        saveLog(); renderLog(); regenerateIfActive();
+      });
+    }
   });
 }
 
@@ -1616,7 +2273,8 @@ function renderEstimate(){
         name,
         items: estimateItems.filter(it=>it.qty>0).map(it => ({id: it.id, qty: it.qty})),
         status: 'queued',
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        manualDone: 0
       });
       saveJobs();
       nameInput.value = '';
@@ -1747,7 +2405,7 @@ function renderFilament(){
   const retiredSpools = spools.filter(s => s.retired);
 
   function spoolCard(s, retired){
-    const pct = s.totalG>0 ? Math.max(0,Math.min(100, (s.remainingG/s.totalG)*100)) : 0;
+    const pct = s.totalG>0 ? Math.max(0,Math.min(100, ((s.totalG-s.remainingG)/s.totalG)*100)) : 0;
     const low = !retired && s.remainingG <= LOW_STOCK_G;
     const logEntries = productionLog.filter(e => e.spoolIdAtLogTime === s.id);
     const loggedWeight = logEntries.reduce((sum,e) => sum + (e.weightGAtLogTime||0), 0);
@@ -1887,8 +2545,9 @@ function renderFilament(){
         if(printerId){
           const p = printers.find(x=>x.id===printerId);
           if(p) p.spoolId = id;
+          stampSpoolLoad(id, printerId);
         }
-        savePrinters();
+        savePrinters(); saveSpools();
         renderFilament(); renderPrinters(); regenerateIfActive();
       });
     }
@@ -1909,6 +2568,109 @@ function renderFilament(){
 
 // ---------- rendering: Catalog tab ----------
 let typeErrorMsg = '';
+let filesOpenFor = new Set(); // session-only: which products have the per-printer files panel expanded
+let batchesOpenFor = new Set(); // session-only: which products have the batch configs panel expanded
+let batchFilesOpenFor = new Set(); // session-only: which "productId::configId" have their own files panel expanded
+
+function renderBatchFilesCell(p, cfg){
+  const key = p.id + '::' + cfg.id;
+  const fileCount = Object.keys(cfg.projectFiles||{}).length;
+  const isOpen = batchFilesOpenFor.has(key);
+  const targets = [{id:'_any', name:'Default (any printer)'}, ...printers.map(pr => ({id: pr.id, name: pr.name}))];
+  const rowsHtml = targets.map(target => {
+    const entry = cfg.projectFiles && cfg.projectFiles[target.id];
+    let action;
+    if(entry){
+      action = `
+        <a class="ps-btn ghost small" href="orcaslicer://open?file=${encodeURIComponent(entry.url)}" title="Opens OrcaSlicer with this file">Open</a>
+        <button class="ps-btn ghost small" data-action="remove-batch-file" data-configid="${cfg.id}" data-target="${target.id}">✕</button>
+      `;
+    } else if(window.uploadProjectFile){
+      action = `
+        <input type="file" data-action="upload-batch-file" data-configid="${cfg.id}" data-target="${target.id}" style="display:none;" accept=".3mf,.stl,.step,.stp,.gcode" />
+        <button class="ps-btn ghost small" data-action="trigger-batch-upload" data-configid="${cfg.id}" data-target="${target.id}">Upload…</button>
+      `;
+    } else {
+      action = `<span class="ps-hint">—</span>`;
+    }
+    return `
+      <div class="ps-row" style="justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px solid var(--line);">
+        <span class="ps-hint">${escapeHtml(target.name)}</span>
+        <div class="ps-row" style="gap:4px;">${action}</div>
+      </div>
+    `;
+  }).join('');
+  return `
+    <button class="ps-btn ghost small" data-action="toggle-batch-files-panel" data-configid="${cfg.id}">${fileCount>0 ? `Files (${fileCount})` : 'Files…'}</button>
+    ${isOpen ? `<div class="ps-files-panel">${rowsHtml}</div>` : ''}
+  `;
+}
+
+function renderBatchesCell(p){
+  const isOpen = batchesOpenFor.has(p.id);
+  const count = p.batchConfigs.length;
+  const configRows = p.batchConfigs.map(cfg => `
+    <div style="padding:8px 0;border-bottom:1px solid var(--line);">
+      <div class="ps-row" style="justify-content:space-between;flex-wrap:wrap;gap:8px;">
+        <div class="ps-row" style="gap:4px;flex-wrap:wrap;">
+          <input class="ps-input ps-narrow" type="number" min="2" data-action="batch-units" data-configid="${cfg.id}" value="${cfg.unitsPerBatch}" style="width:56px;" title="Units per batch" /><span class="ps-hint">units ·</span>
+          <input class="ps-input ps-narrow" type="number" min="0" data-action="batch-timeh" data-configid="${cfg.id}" value="${cfg.timeH}" style="width:50px;" /><span class="ps-hint">h</span>
+          <input class="ps-input ps-narrow" type="number" min="0" max="59" data-action="batch-timem" data-configid="${cfg.id}" value="${cfg.timeM}" style="width:50px;" /><span class="ps-hint">m ·</span>
+          <input class="ps-input ps-narrow" type="number" min="0" data-action="batch-weight" data-configid="${cfg.id}" value="${cfg.weightG}" style="width:60px;" /><span class="ps-hint">g</span>
+        </div>
+        <button class="ps-btn ghost small" data-action="remove-batch" data-configid="${cfg.id}">✕</button>
+      </div>
+      <div style="margin-top:6px;">${renderBatchFilesCell(p, cfg)}</div>
+    </div>
+  `).join('');
+  return `
+    <button class="ps-btn small" data-action="toggle-batches-panel">${count>0 ? `Batches (${count})` : 'Batches…'}</button>
+    ${isOpen ? `<div class="ps-files-panel">
+      <div class="ps-hint" style="margin-bottom:8px;">Alternate ways to print multiple units of this product in one physical print — e.g. an 8-up plate. The product's normal time/weight (left) stay the single-unit numbers; a batch here is logged separately and credits several units at once.</div>
+      ${p.batchConfigs.length===0 ? '<div class="ps-empty">No batch configs yet.</div>' : configRows}
+      <button class="ps-btn small" style="margin-top:8px;" data-action="add-batch">+ Add batch config</button>
+    </div>` : ''}
+  `;
+}
+
+function renderFilesCell(p){
+  const fileCount = Object.keys(p.projectFiles||{}).length;
+  const isOpen = filesOpenFor.has(p.id);
+  const targets = [{id:'_any', name:'Default (any printer)'}, ...printers.map(pr => ({id: pr.id, name: pr.name}))];
+
+  const rowsHtml = targets.map(target => {
+    const entry = p.projectFiles && p.projectFiles[target.id];
+    let action;
+    if(entry){
+      action = `
+        <a class="ps-btn ghost small" href="orcaslicer://open?file=${encodeURIComponent(entry.url)}" title="Opens OrcaSlicer with this file">Open</a>
+        <button class="ps-btn ghost small" data-action="remove-printer-file" data-target="${target.id}">✕</button>
+      `;
+    } else if(window.uploadProjectFile){
+      action = `
+        <input type="file" data-action="upload-printer-file" data-target="${target.id}" style="display:none;" accept=".3mf,.stl,.step,.stp,.gcode" />
+        <button class="ps-btn ghost small" data-action="trigger-printer-upload" data-target="${target.id}">Upload…</button>
+      `;
+    } else {
+      action = `<span class="ps-hint" title="File uploads need Supabase Storage, which only exists on the deployed site.">—</span>`;
+    }
+    return `
+      <div class="ps-row" style="justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px solid var(--line);">
+        <span class="ps-hint">${escapeHtml(target.name)}</span>
+        <div class="ps-row" style="gap:4px;">${action}</div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <button class="ps-btn small" data-action="toggle-files-panel">${fileCount>0 ? `Files (${fileCount})` : 'Files…'}</button>
+    ${isOpen ? `<div class="ps-files-panel">
+      <div class="ps-hint" style="margin-bottom:6px;">A file here overrides Default for that specific printer — useful when a printer (like a different brand) needs its own profile for the same product.</div>
+      ${rowsHtml}
+    </div>` : ''}
+  `;
+}
+
 
 function renderCatalog(){
   const root = document.getElementById('ps-tab-catalog');
@@ -1927,9 +2689,16 @@ function renderCatalog(){
           <input class="ps-input ps-narrow" type="number" min="0" data-field="timeH" value="${p.timeH}" /><span class="ps-hint">h</span>
           <input class="ps-input ps-narrow" type="number" min="0" max="59" data-field="timeM" value="${p.timeM}" /><span class="ps-hint">m</span>
         </div>
-        ${avg ? `<div class="ps-hint">Logged avg: ${fmtDuration(avg.avgMin)} over ${avg.count} print${avg.count!==1?'s':''}</div>` : ''}
+        ${avg ? (() => {
+          const catalogMin = p.timeH*60 + p.timeM;
+          const runningLong = avg.count >= 2 && catalogMin>0 && avg.avgMin > catalogMin * 1.10;
+          const pctOver = catalogMin>0 ? Math.round((avg.avgMin/catalogMin - 1)*100) : 0;
+          return `<div class="ps-hint" style="${runningLong?'color:var(--heat);':''}">Logged avg: ${fmtDuration(avg.avgMin)} over ${avg.count} print${avg.count!==1?'s':''}${runningLong ? ` — running ~${pctOver}% longer than your estimate, worth bumping up?` : ''}</div>`;
+        })() : ''}
       </td>
       <td><input class="ps-input ps-narrow" style="width:80px" type="number" min="0" data-field="weightG" value="${p.weightG}" /></td>
+      <td>${renderFilesCell(p)}</td>
+      <td>${renderBatchesCell(p)}</td>
       <td><button class="ps-btn ghost" data-action="remove" title="Remove product">✕</button></td>
     </tr>
   `;
@@ -1945,6 +2714,13 @@ function renderCatalog(){
 
   root.innerHTML = `
     <div class="ps-panel">
+      <div class="ps-panel-title"><span class="dot"></span>Import from G-code</div>
+      <div class="ps-hint" style="margin-bottom:10px;">Reads the estimated print time and filament weight straight out of a sliced .gcode file — no re-typing. Works with OrcaSlicer, PrusaSlicer, Bambu Studio, and Cura's comment formats.</div>
+      <input type="file" id="ps-gcode-file" accept=".gcode,.gco,.g" style="display:none;" />
+      <button class="ps-btn" id="ps-gcode-trigger">Choose G-code file…</button>
+      <div id="ps-gcode-result" style="margin-top:12px;"></div>
+    </div>
+    <div class="ps-panel">
       <div class="ps-panel-title"><span class="dot"></span>Product Types</div>
       <div id="ps-types-list">${typeRows}</div>
       <div style="margin-top:10px;">
@@ -1957,7 +2733,7 @@ function renderCatalog(){
       <div class="ps-panel-title"><span class="dot"></span>Product Catalog</div>
       <div style="overflow-x:auto;">
       <table class="ps-table">
-        <thead><tr><th style="width:32%">Product</th><th style="width:16%">Type</th><th style="width:24%">Print time</th><th style="width:16%">Weight (g)</th><th style="width:8%"></th></tr></thead>
+        <thead><tr><th style="width:22%">Product</th><th style="width:10%">Type</th><th style="width:16%">Print time</th><th style="width:10%">Weight (g)</th><th style="width:16%">Project file</th><th style="width:16%">Batches</th><th style="width:8%"></th></tr></thead>
         <tbody id="ps-catalog-body">${rows}</tbody>
       </table>
       </div>
@@ -1999,6 +2775,108 @@ function renderCatalog(){
     saveTypes(); renderCatalog();
   });
 
+  document.getElementById('ps-gcode-trigger').addEventListener('click', () => {
+    document.getElementById('ps-gcode-file').click();
+  });
+  document.getElementById('ps-gcode-file').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    const resultEl = document.getElementById('ps-gcode-result');
+    if(!file) return;
+    resultEl.innerHTML = '<div class="ps-hint">Reading file…</div>';
+    let text;
+    try {
+      text = await file.text();
+    } catch(err){
+      resultEl.innerHTML = `<div class="ps-warnbox">Couldn't read that file.</div>`;
+      e.target.value = '';
+      return;
+    }
+
+    const {timeMin, weightG} = parseGcodeMetadata(text);
+    const foundNote = (timeMin!=null || weightG!=null)
+      ? `Found: ${timeMin!=null ? fmtDuration(timeMin) : 'no time found'}${weightG!=null ? ', '+Math.round(weightG)+'g' : ', no weight found'}`
+      : `Couldn't find a time or weight estimate in this file — it may not be sliced, or your slicer's comment format isn't one I recognize yet. Enter values manually below if you still want to use it.`;
+    const guessedName = file.name.replace(/\.(gcode|gco|g)$/i, '').replace(/[_-]+/g, ' ').trim();
+    const h = timeMin!=null ? Math.floor(timeMin/60) : 0;
+    const m = timeMin!=null ? timeMin%60 : 0;
+    const w = weightG!=null ? Math.round(weightG) : 0;
+    const existingOptions = catalog.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+
+    resultEl.innerHTML = `
+      <div class="ps-hint" style="margin-bottom:8px;">${foundNote}</div>
+      <div class="ps-row" style="flex-wrap:wrap;align-items:flex-end;">
+        <div class="ps-field" style="flex:1;min-width:160px;margin-bottom:0;">
+          <span class="ps-field-label">Product name</span>
+          <input class="ps-input" id="ps-gcode-name" value="${escapeHtml(guessedName)}" />
+        </div>
+        <div class="ps-field" style="margin-bottom:0;">
+          <span class="ps-field-label">Time</span>
+          <div class="ps-row" style="gap:4px;">
+            <input class="ps-input ps-narrow" type="number" min="0" id="ps-gcode-timeh" value="${h}" /><span class="ps-hint">h</span>
+            <input class="ps-input ps-narrow" type="number" min="0" max="59" id="ps-gcode-timem" value="${m}" /><span class="ps-hint">m</span>
+          </div>
+        </div>
+        <div class="ps-field" style="margin-bottom:0;">
+          <span class="ps-field-label">Weight (g)</span>
+          <input class="ps-input ps-narrow" type="number" min="0" id="ps-gcode-weight" value="${w}" style="width:80px;" />
+        </div>
+        <div class="ps-field" style="margin-bottom:0;">
+          <span class="ps-field-label">Units on this plate</span>
+          <input class="ps-input ps-narrow" type="number" min="1" id="ps-gcode-units" value="1" style="width:70px;" title="If this file is a multi-up plate (several copies of the same product printed at once), set how many units it produces." />
+        </div>
+      </div>
+      <div class="ps-row" style="margin-top:12px;flex-wrap:wrap;">
+        <button class="ps-btn primary small" id="ps-gcode-create">Add as new product</button>
+        <select class="ps-select" id="ps-gcode-existing-select" style="max-width:200px;">
+          <option value="">— or update existing —</option>
+          ${existingOptions}
+        </select>
+        <button class="ps-btn small" id="ps-gcode-update">Apply to selected</button>
+        <button class="ps-btn small" id="ps-gcode-add-batch">Add as batch on selected</button>
+      </div>
+      <div class="ps-hint" style="margin-top:6px;">"Apply to selected" overwrites that product's normal single-unit numbers. "Add as batch" keeps those untouched and adds this as an additional way to print it — use that for a multi-up plate.</div>
+    `;
+
+    document.getElementById('ps-gcode-create').addEventListener('click', () => {
+      const name = document.getElementById('ps-gcode-name').value.trim() || 'New product';
+      const timeH = Math.max(0, parseInt(document.getElementById('ps-gcode-timeh').value)||0);
+      const timeM = Math.max(0, parseInt(document.getElementById('ps-gcode-timem').value)||0);
+      const weight = Math.max(0, parseInt(document.getElementById('ps-gcode-weight').value)||0);
+      const newId = uid('prod');
+      catalog.push({id:newId, name, type: types[0].id, timeH, timeM, weightG: weight, projectFiles:{}, batchConfigs:[]});
+      priorityOrder.push(newId);
+      saveCatalog(); saveOrder();
+      renderCatalog(); renderSchedule(); regenerateIfActive();
+    });
+    document.getElementById('ps-gcode-update').addEventListener('click', () => {
+      const pid = document.getElementById('ps-gcode-existing-select').value;
+      if(!pid) return;
+      const p = catalog.find(x=>x.id===pid);
+      if(!p) return;
+      p.timeH = Math.max(0, parseInt(document.getElementById('ps-gcode-timeh').value)||0);
+      p.timeM = Math.max(0, parseInt(document.getElementById('ps-gcode-timem').value)||0);
+      p.weightG = Math.max(0, parseInt(document.getElementById('ps-gcode-weight').value)||0);
+      saveCatalog();
+      renderCatalog(); renderSchedule(); regenerateIfActive();
+    });
+    document.getElementById('ps-gcode-add-batch').addEventListener('click', () => {
+      const pid = document.getElementById('ps-gcode-existing-select').value;
+      if(!pid) return;
+      const p = catalog.find(x=>x.id===pid);
+      if(!p) return;
+      const timeH = Math.max(0, parseInt(document.getElementById('ps-gcode-timeh').value)||0);
+      const timeM = Math.max(0, parseInt(document.getElementById('ps-gcode-timem').value)||0);
+      const weight = Math.max(0, parseInt(document.getElementById('ps-gcode-weight').value)||0);
+      const units = Math.max(2, parseInt(document.getElementById('ps-gcode-units').value)||2);
+      if(!p.batchConfigs) p.batchConfigs = [];
+      p.batchConfigs.push({id: uid('batch'), unitsPerBatch: units, timeH, timeM, weightG: weight, projectFiles: {}});
+      saveCatalog();
+      renderCatalog(); regenerateIfActive();
+    });
+
+    e.target.value = '';
+  });
+
   root.querySelectorAll('#ps-catalog-body tr').forEach(tr => {
     const id = tr.getAttribute('data-id');
     tr.querySelectorAll('[data-field]').forEach(input => {
@@ -2020,11 +2898,162 @@ function renderCatalog(){
       saveCatalog(); saveOrder();
       renderCatalog(); renderSchedule(); regenerateIfActive();
     });
+    const toggleFilesBtn = tr.querySelector('[data-action="toggle-files-panel"]');
+    if(toggleFilesBtn){
+      toggleFilesBtn.addEventListener('click', () => {
+        if(filesOpenFor.has(id)) filesOpenFor.delete(id);
+        else filesOpenFor.add(id);
+        renderCatalog();
+      });
+    }
+    tr.querySelectorAll('[data-action="trigger-printer-upload"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const target = btn.getAttribute('data-target');
+        tr.querySelector(`[data-action="upload-printer-file"][data-target="${target}"]`).click();
+      });
+    });
+    tr.querySelectorAll('[data-action="upload-printer-file"]').forEach(input => {
+      input.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if(!file) return;
+        const target = input.getAttribute('data-target');
+        const p = catalog.find(x=>x.id===id);
+        const btn = tr.querySelector(`[data-action="trigger-printer-upload"][data-target="${target}"]`);
+        btn.disabled = true;
+        btn.textContent = 'Uploading…';
+        try {
+          const path = `${id}-${target}-${Date.now()}-${file.name}`;
+          const url = await window.uploadProjectFile(file, path);
+          if(!p.projectFiles) p.projectFiles = {};
+          p.projectFiles[target] = {url, path};
+          saveCatalog();
+          renderCatalog();
+        } catch(err){
+          btn.disabled = false;
+          btn.textContent = 'Upload…';
+          alert('Upload failed: ' + (err.message||err));
+        }
+      });
+    });
+    tr.querySelectorAll('[data-action="remove-printer-file"]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const target = btn.getAttribute('data-target');
+        const p = catalog.find(x=>x.id===id);
+        const entry = p.projectFiles && p.projectFiles[target];
+        try {
+          if(window.deleteProjectFile && entry && entry.path) await window.deleteProjectFile(entry.path);
+        } catch(err){ console.error(err); }
+        if(p.projectFiles) delete p.projectFiles[target];
+        saveCatalog();
+        renderCatalog();
+      });
+    });
+
+    // ---- Batch configs ----
+    const toggleBatchesBtn = tr.querySelector('[data-action="toggle-batches-panel"]');
+    if(toggleBatchesBtn){
+      toggleBatchesBtn.addEventListener('click', () => {
+        if(batchesOpenFor.has(id)) batchesOpenFor.delete(id);
+        else batchesOpenFor.add(id);
+        renderCatalog();
+      });
+    }
+    tr.querySelectorAll('[data-action="batch-units"],[data-action="batch-timeh"],[data-action="batch-timem"],[data-action="batch-weight"]').forEach(input => {
+      input.addEventListener('change', () => {
+        const configId = input.getAttribute('data-configid');
+        const p = catalog.find(x=>x.id===id);
+        const cfg = p.batchConfigs.find(c=>c.id===configId);
+        if(!cfg) return;
+        const action = input.getAttribute('data-action');
+        const val = Math.max(action==='batch-units'?2:0, parseInt(input.value)||0);
+        if(action==='batch-units') cfg.unitsPerBatch = Math.max(2, val);
+        else if(action==='batch-timeh') cfg.timeH = val;
+        else if(action==='batch-timem') cfg.timeM = Math.min(59, val);
+        else if(action==='batch-weight') cfg.weightG = val;
+        saveCatalog();
+      });
+    });
+    tr.querySelectorAll('[data-action="remove-batch"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const configId = btn.getAttribute('data-configid');
+        const p = catalog.find(x=>x.id===id);
+        p.batchConfigs = p.batchConfigs.filter(c=>c.id!==configId);
+        saveCatalog();
+        renderCatalog();
+      });
+    });
+    const addBatchBtn = tr.querySelector('[data-action="add-batch"]');
+    if(addBatchBtn){
+      addBatchBtn.addEventListener('click', () => {
+        const p = catalog.find(x=>x.id===id);
+        p.batchConfigs.push({id: uid('batch'), unitsPerBatch: 2, timeH: p.timeH, timeM: p.timeM, weightG: p.weightG*2, projectFiles: {}});
+        saveCatalog();
+        renderCatalog();
+      });
+    }
+    tr.querySelectorAll('[data-action="toggle-batch-files-panel"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const configId = btn.getAttribute('data-configid');
+        const key = id + '::' + configId;
+        if(batchFilesOpenFor.has(key)) batchFilesOpenFor.delete(key);
+        else batchFilesOpenFor.add(key);
+        renderCatalog();
+      });
+    });
+    tr.querySelectorAll('[data-action="trigger-batch-upload"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const configId = btn.getAttribute('data-configid');
+        const target = btn.getAttribute('data-target');
+        tr.querySelector(`[data-action="upload-batch-file"][data-configid="${configId}"][data-target="${target}"]`).click();
+      });
+    });
+    tr.querySelectorAll('[data-action="upload-batch-file"]').forEach(input => {
+      input.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if(!file) return;
+        const configId = input.getAttribute('data-configid');
+        const target = input.getAttribute('data-target');
+        const p = catalog.find(x=>x.id===id);
+        const cfg = p.batchConfigs.find(c=>c.id===configId);
+        if(!cfg) return;
+        const btn = tr.querySelector(`[data-action="trigger-batch-upload"][data-configid="${configId}"][data-target="${target}"]`);
+        btn.disabled = true;
+        btn.textContent = 'Uploading…';
+        try {
+          const path = `${id}-batch-${configId}-${target}-${Date.now()}-${file.name}`;
+          const url = await window.uploadProjectFile(file, path);
+          if(!cfg.projectFiles) cfg.projectFiles = {};
+          cfg.projectFiles[target] = {url, path};
+          saveCatalog();
+          renderCatalog();
+        } catch(err){
+          btn.disabled = false;
+          btn.textContent = 'Upload…';
+          alert('Upload failed: ' + (err.message||err));
+        }
+      });
+    });
+    tr.querySelectorAll('[data-action="remove-batch-file"]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const configId = btn.getAttribute('data-configid');
+        const target = btn.getAttribute('data-target');
+        const p = catalog.find(x=>x.id===id);
+        const cfg = p.batchConfigs.find(c=>c.id===configId);
+        if(!cfg) return;
+        const entry = cfg.projectFiles && cfg.projectFiles[target];
+        try {
+          if(window.deleteProjectFile && entry && entry.path) await window.deleteProjectFile(entry.path);
+        } catch(err){ console.error(err); }
+        if(cfg.projectFiles) delete cfg.projectFiles[target];
+        saveCatalog();
+        renderCatalog();
+      });
+    });
   });
 
   document.getElementById('ps-add-product').addEventListener('click', () => {
     const id = uid('prod');
-    catalog.push({id, name:'New product', type: types[0].id, timeH:0, timeM:0, weightG:0});
+    catalog.push({id, name:'New product', type: types[0].id, timeH:0, timeM:0, weightG:0, projectFiles:{}, batchConfigs:[]});
     priorityOrder.push(id);
     saveCatalog(); saveOrder();
     renderCatalog(); renderSchedule();
@@ -2038,7 +3067,7 @@ function exportAllData(){
   const snapshot = {
     exportedAt: new Date().toISOString(),
     version: 1,
-    catalog, types, settings, printers, spools, stock, orderQty, priorityOrder, productionLog, estimateItems, estimateScenarios, jobs
+    catalog, types, settings, printers, spools, stock, orderQty, priorityOrder, productionLog, estimateItems, estimateScenarios, jobs, partDefs
   };
   const blob = new Blob([JSON.stringify(snapshot, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
@@ -2067,17 +3096,28 @@ async function importAllData(jsonText){
   if(Array.isArray(data.estimateItems)) estimateItems = data.estimateItems;
   if(Array.isArray(data.estimateScenarios) && data.estimateScenarios.length>0) estimateScenarios = data.estimateScenarios;
   if(Array.isArray(data.jobs)) jobs = data.jobs;
+  if(Array.isArray(data.partDefs)){
+    partDefs = data.partDefs;
+    partDefs.forEach(pd => { if(!Array.isArray(pd.replacementLog)) pd.replacementLog = []; });
+  }
 
   // Keep priorityOrder consistent with whatever catalog came in.
   priorityOrder = priorityOrder.filter(id => catalog.some(p=>p.id===id));
   catalog.forEach(p => { if(!priorityOrder.includes(p.id)) priorityOrder.push(p.id); });
   printers.forEach(p => { if(!('spoolId' in p)) p.spoolId = null; });
+  printers.forEach(p => { if(!('hoursResetAt' in p)) p.hoursResetAt = null; });
+  printers.forEach(p => {
+    if(!p.partInstalls) p.partInstalls = {};
+    partDefs.forEach(pd => {
+      if(!p.partInstalls[pd.id]) p.partInstalls[pd.id] = {installedAt: new Date().toISOString(), notified:false};
+    });
+  });
   Object.keys(orderQty).forEach(id => {
     if(typeof orderQty[id] === 'number'){ orderQty[id] = {qty: orderQty[id], pin: null}; }
   });
 
   await Promise.all([
-    saveCatalog(), saveTypes(), saveSettings(), savePrinters(), saveSpools(), saveStock(), saveOrder(), saveLog(), saveEstimateItems(), saveEstimateScenarios(), saveJobs()
+    saveCatalog(), saveTypes(), saveSettings(), savePrinters(), saveSpools(), saveStock(), saveOrder(), saveLog(), saveEstimateItems(), saveEstimateScenarios(), saveJobs(), savePartDefs()
   ]);
   syncConsumption();
 
@@ -2118,7 +3158,7 @@ function renderSettings(){
       <div class="ps-panel-title"><span class="dot"></span>Notifications</div>
       <div id="ps-notif-status" class="ps-hint" style="margin-bottom:10px;"></div>
       <button class="ps-btn" id="ps-notif-enable">Enable browser notifications</button>
-      <div class="ps-hint" style="margin-top:10px;">When something's actually printing (logged with a start but no finish yet), you'll get a notification about 5 minutes before its estimated finish — names the product and which printer. Needs this tab to stay open somewhere (doesn't need to be focused, just not closed), and works best on the deployed site — Claude's chat window may block notification permissions entirely.</div>
+      <div class="ps-hint" style="margin-top:10px;">When something's actually printing (logged with a start but no finish yet), you'll get a notification about 5 minutes before its estimated finish — names the product and which printer. You'll also get one when a maintenance part (tracked on the Printers tab) reaches its lifespan. Needs this tab to stay open somewhere (doesn't need to be focused, just not closed), and works best on the deployed site — Claude's chat window may block notification permissions entirely.</div>
     </div>
     <div class="ps-panel">
       <div class="ps-panel-title"><span class="dot"></span>Data</div>
@@ -2188,6 +3228,19 @@ function renderSchedule(){
     const pinOptions = `<option value="">Any (auto)</option>` + printers.map(pr =>
       `<option value="${pr.id}" ${entry.pin===pr.id?'selected':''}>${escapeHtml(pr.name)}${pr.status==='down'?' (down)':''}</option>`
     ).join('');
+    const hasBatches = p.batchConfigs && p.batchConfigs.length>0;
+    const selectedBatch = hasBatches ? p.batchConfigs.find(c=>c.id===entry.batchConfigId) : null;
+    const runAsOptions = hasBatches ? `<option value="">Singles only</option>` + p.batchConfigs.map(c =>
+      `<option value="${c.id}" ${entry.batchConfigId===c.id?'selected':''}>${c.unitsPerBatch}× batches</option>`
+    ).join('') : '';
+    let breakdownHint = '';
+    if(selectedBatch && entry.qty>0){
+      const fullBatches = Math.floor(entry.qty / selectedBatch.unitsPerBatch);
+      const remainder = entry.qty % selectedBatch.unitsPerBatch;
+      breakdownHint = fullBatches>0
+        ? `<div class="ps-hint mono">${fullBatches}× ${selectedBatch.unitsPerBatch}-batch${remainder>0?' + '+remainder+' single'+(remainder!==1?'s':''):''}</div>`
+        : `<div class="ps-hint mono" style="color:var(--heat);">qty too low for a full batch — all singles</div>`;
+    }
     return `
       <tr data-id="${id}">
         <td>
@@ -2206,6 +3259,9 @@ function renderSchedule(){
           <input class="ps-input ps-narrow" type="number" min="0" data-field="qty" value="${entry.qty}" />
           ${logged>0 ? `<div class="ps-hint mono">${logged} logged today</div>` : ''}
         </td>
+        <td>
+          ${hasBatches ? `<select class="ps-select" data-field="batchConfigId">${runAsOptions}</select>${breakdownHint}` : `<span class="ps-hint">—</span>`}
+        </td>
         <td><select class="ps-select" data-field="pin">${pinOptions}</select></td>
       </tr>`;
   }).join('');
@@ -2219,7 +3275,7 @@ function renderSchedule(){
       <div class="ps-hint" style="margin-bottom:12px;">${activeCount} printer${activeCount!==1?'s':''} active${downCount>0? ', '+downCount+' down':''} — manage this on the Printers tab.</div>
       <div style="overflow-x:auto;">
       <table class="ps-table">
-        <thead><tr><th style="width:60px">Priority</th><th>Product</th><th style="width:80px">Print time</th><th style="width:70px">Qty</th><th style="width:150px">Printer</th></tr></thead>
+        <thead><tr><th style="width:60px">Priority</th><th>Product</th><th style="width:80px">Print time</th><th style="width:70px">Qty</th><th style="width:130px">Run as</th><th style="width:150px">Printer</th></tr></thead>
         <tbody id="ps-order-body">${rows}</tbody>
       </table>
       </div>
@@ -2242,6 +3298,13 @@ function renderSchedule(){
       getOrderEntry(id).pin = e.target.value || null;
       saveOrder(); regenerateIfActive();
     });
+    const batchSelect = tr.querySelector('[data-field="batchConfigId"]');
+    if(batchSelect){
+      batchSelect.addEventListener('change', e => {
+        getOrderEntry(id).batchConfigId = e.target.value || null;
+        saveOrder(); regenerateIfActive();
+      });
+    }
     const upBtn = tr.querySelector('[data-action="up"]');
     const downBtn = tr.querySelector('[data-action="down"]');
     if(upBtn) upBtn.addEventListener('click', () => { moveInPriority(id,-1); });
@@ -2274,10 +3337,12 @@ function regenerateIfActive(){
   if(document.getElementById('ps-tab-estimate')) renderEstimate();
   if(document.getElementById('ps-tab-jobs')) renderJobs();
   if(document.getElementById('ps-tab-catalog')) renderCatalog();
+  if(document.getElementById('ps-tab-printers')) renderPrinters();
   if(liveSchedule){
     const out = document.getElementById('ps-schedule-output');
     if(out) onGenerate();
   }
+  if(document.getElementById('ps-tab-status')) renderStatus();
 }
 
 function onGenerate(){
@@ -2293,8 +3358,22 @@ function onGenerate(){
     if(!p) return;
     const printTimeMin = p.timeH*60 + p.timeM;
     if(printTimeMin<=0){ missing.push(p.name); return; }
-    for(let i=0;i<entry.qty;i++){
-      queue.push({productId:id, name:p.name, type:p.type, weightG:p.weightG, printTimeMin, pin: entry.pin || null});
+
+    const batchCfg = entry.batchConfigId ? (p.batchConfigs||[]).find(c=>c.id===entry.batchConfigId) : null;
+    if(batchCfg){
+      const fullBatches = Math.floor(entry.qty / batchCfg.unitsPerBatch);
+      const remainder = entry.qty % batchCfg.unitsPerBatch;
+      const batchTimeMin = batchCfg.timeH*60 + batchCfg.timeM;
+      for(let i=0;i<fullBatches;i++){
+        queue.push({productId:id, name:`${batchCfg.unitsPerBatch}× ${p.name}`, type:p.type, weightG:batchCfg.weightG, printTimeMin:batchTimeMin, pin: entry.pin || null, unitsPerBatch: batchCfg.unitsPerBatch});
+      }
+      for(let i=0;i<remainder;i++){
+        queue.push({productId:id, name:p.name, type:p.type, weightG:p.weightG, printTimeMin, pin: entry.pin || null});
+      }
+    } else {
+      for(let i=0;i<entry.qty;i++){
+        queue.push({productId:id, name:p.name, type:p.type, weightG:p.weightG, printTimeMin, pin: entry.pin || null});
+      }
     }
   });
 
@@ -2340,6 +3419,7 @@ liveSchedule = makeSummary(buildMultiSchedule(queue, activePrinters, settings, '
   liveSchedule.mode = 'live';
 
   renderScheduleView();
+  if(document.getElementById('ps-tab-status')) renderStatus();
 }
 
 function renderScheduleView(){
@@ -2422,6 +3502,16 @@ function renderScheduleOutput(sched, container){
     const todayMidnight = new Date(); todayMidnight.setHours(0,0,0,0);
     let prevProductId = null;
 
+    // Real spool swaps on this printer (from "Change Spool" on the Printers
+    // tab), chronological, so we can show exactly where in the timeline each
+    // one actually happened — not just where the projection warns one's due.
+    const spoolEvents = sched.mode === 'live'
+      ? spools.filter(s => s.loadedOnPrinterId === m.id && s.loadedAt)
+          .map(s => ({at: new Date(s.loadedAt), label: s.label}))
+          .sort((a,b) => a.at - b.at)
+      : [];
+    let spoolEventIdx = 0;
+
     function weekKeyOf(date){
       const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
       d.setDate(d.getDate() - d.getDay()); // back up to the Sunday starting this week
@@ -2488,7 +3578,13 @@ function renderScheduleOutput(sched, container){
       const jobLines = jobs.map((j,i) => {
         const marker = j.failed ? '<span style="color:var(--danger)">✕ failed</span> — ' : (j.actual ? (j.inProgress ? '<span style="color:var(--heat)">▶ printing now</span> — ' : '✓ ') : '');
         const changeover = changeFlags[i] ? `<div class="ps-changeover">switch to ${escapeHtml(j.name)}</div>` : '';
+        let spoolChangeMarkers = '';
+        while(spoolEventIdx < spoolEvents.length && spoolEvents[spoolEventIdx].at <= j.start){
+          spoolChangeMarkers += `<div class="ps-changeover" style="color:var(--ok);">⟳ spool changed to "${escapeHtml(spoolEvents[spoolEventIdx].label)}" — ${fmtDateHead(spoolEvents[spoolEventIdx].at)} ${fmtClock(spoolEvents[spoolEventIdx].at)}</div>`;
+          spoolEventIdx++;
+        }
         return `
+        ${spoolChangeMarkers}
         ${changeover}
         <div>${marker}<b>${escapeHtml(j.name)}</b> — ${fmtClock(j.start)} → ${j.inProgress ? 'now' : fmtClock(j.end)}${j.overnight?' <span style="color:var(--heat)">(runs unattended past window close)</span>':''}${j.spoolShort?' <span class="ps-swap-tag">swap spool before this</span>':''}</div>
       `;
@@ -2584,7 +3680,12 @@ function renderScheduleOutput(sched, container){
         `);
       }
     }
-    const daysHtml = dayPieces.join('');
+    let trailingSpoolEvents = '';
+    while(spoolEventIdx < spoolEvents.length){
+      trailingSpoolEvents += `<div class="ps-changeover" style="color:var(--ok);">⟳ spool changed to "${escapeHtml(spoolEvents[spoolEventIdx].label)}" — ${fmtDateHead(spoolEvents[spoolEventIdx].at)} ${fmtClock(spoolEvents[spoolEventIdx].at)} — nothing scheduled here since</div>`;
+      spoolEventIdx++;
+    }
+    const daysHtml = dayPieces.join('') + trailingSpoolEvents;
 
     const legend = (sched.mode === 'live' && anyActualShown) ? `
       <div class="ps-legend">
@@ -2670,7 +3771,7 @@ function setupTabs(){
       document.querySelectorAll('.ps-tab').forEach(t=>t.classList.remove('active'));
       tab.classList.add('active');
       const target = tab.getAttribute('data-tab');
-      ['schedule','log','estimate','jobs','printers','filament','catalog','settings'].forEach(name => {
+      ['status','schedule','log','estimate','jobs','printers','filament','catalog','settings'].forEach(name => {
         document.getElementById('ps-tab-'+name).style.display = (name===target) ? '' : 'none';
       });
     });
@@ -2700,6 +3801,7 @@ async function startApp(){
   await loadState();
   syncConsumption();
   setupTabs();
+  renderStatus();
   renderSchedule();
   renderLog();
   renderEstimate();
@@ -2709,7 +3811,8 @@ async function startApp(){
   renderCatalog();
   renderSettings();
   checkFinishNotifications();
-  setInterval(checkFinishNotifications, 20000);
+  checkMaintenanceNotifications();
+  setInterval(() => { checkFinishNotifications(); checkMaintenanceNotifications(); renderStatus(); }, 20000);
 }
 // In the normal Claude-artifact context (and in a standalone build with no
 // auth configured), start immediately. A standalone build with auth enabled
