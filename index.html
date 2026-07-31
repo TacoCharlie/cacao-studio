@@ -2968,7 +2968,10 @@ function renderFilament(){
       <td><input class="ps-input" type="color" style="max-width:44px;padding:2px;" data-field="colorHex" value="${st.colorHex||'#cccccc'}" /></td>
       <td><input class="ps-input ps-narrow" type="number" min="1" data-field="weightPerSpoolG" value="${st.weightPerSpoolG}" style="width:80px;" /></td>
       <td><input class="ps-input ps-narrow" type="number" min="0" data-field="qty" value="${st.qty}" /></td>
-      <td><input class="ps-input ps-narrow" type="number" min="0" data-field="qtyOnOrder" value="${st.qtyOnOrder}" /></td>
+      <td>
+        <input class="ps-input ps-narrow" type="number" min="0" data-field="qtyOnOrder" value="${st.qtyOnOrder}" />
+        ${st.qtyOnOrder>0 && st.orderedAt ? `<div class="ps-hint" style="margin-top:3px;white-space:nowrap;">ordered ${new Date(st.orderedAt).toLocaleDateString(undefined,{month:'short',day:'numeric'})}</div>` : ''}
+      </td>
       <td>${st.qtyOnOrder>0 ? `<button class="ps-btn small" data-action="receive-stock">Receive</button>` : ''}</td>
       <td><button class="ps-btn ghost small" data-action="remove-stock">✕</button></td>
     </tr>
@@ -3152,6 +3155,28 @@ function renderFilament(){
       <div style="margin-top:14px;">
         ${leadTimes.map(lt => `<div class="ps-hint">${escapeHtml(lt.manufacturer)} — ${escapeHtml(lt.material)}: avg lead time ${lt.avgDays.toFixed(1)} day${lt.avgDays!==1?'s':''} (based on ${lt.count} order${lt.count!==1?'s':''})</div>`).join('')}
       </div>
+      <div style="margin-top:14px;">
+        <button class="ps-btn ghost small" id="ps-toggle-order-history">${showOrderHistory?'▾':'▸'} Order history (${filamentOrderHistory.length})</button>
+        ${showOrderHistory ? `
+        <div style="overflow-x:auto;margin-top:10px;">
+        <table class="ps-table">
+          <thead><tr><th>Manufacturer</th><th>Material</th><th>Qty</th><th>Ordered</th><th>Received</th><th style="width:90px">Lead time</th></tr></thead>
+          <tbody>
+            ${filamentOrderHistory.slice().sort((a,b)=>new Date(b.receivedAt)-new Date(a.receivedAt)).map(o => `
+              <tr>
+                <td>${escapeHtml(o.manufacturer||'—')}</td>
+                <td>${escapeHtml(o.material||'—')}</td>
+                <td>${o.qty}</td>
+                <td class="mono">${new Date(o.orderedAt).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'})}</td>
+                <td class="mono">${new Date(o.receivedAt).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'})}</td>
+                <td class="mono">${o.leadTimeDays.toFixed(1)}d</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        </div>
+        ` : ''}
+      </div>
       ` : `<div class="ps-hint" style="margin-top:10px;">No completed orders yet — lead times will show here once you place and receive one.</div>`}
     </div>
   `;
@@ -3293,6 +3318,14 @@ function renderFilament(){
       renderFilament();
     });
   }
+
+  const toggleOrderHistoryBtn = document.getElementById('ps-toggle-order-history');
+  if(toggleOrderHistoryBtn){
+    toggleOrderHistoryBtn.addEventListener('click', () => {
+      showOrderHistory = !showOrderHistory;
+      renderFilament();
+    });
+  }
 }
 
 
@@ -3302,6 +3335,7 @@ let editingProductId = null; // null = browsing list; '_new' = add-product form;
 let expandedBatchPreview = new Set(); // catalog list only: which products show their read-only batch sub-rows
 let expandedDoneJobs = new Set(); // Jobs tab: which Done cards show their item breakdown
 let showLowSpools = false; // Filament tab: whether the low/near-empty spools group is expanded
+let showOrderHistory = false; // Filament tab: whether the order-history table under Reorder Planning is expanded
 let editingBatchId = null;   // within a product's editor: null = not editing a batch; '_new' = add-batch form; a real id = editing that batch
 let editingOverrideId = null; // within a product's editor: null = not editing an override; '_new' = add form; a printerId = editing that printer's override
 
