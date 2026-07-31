@@ -4817,7 +4817,7 @@ function exportAllData(){
   const snapshot = {
     exportedAt: new Date().toISOString(),
     version: 1,
-    catalog, types, settings, printers, spools, stock, orderQty, priorityOrder, productionLog, estimateItems, estimateScenarios, jobs, partDefs
+    catalog, types, settings, printers, spools, stock, orderQty, priorityOrder, productionLog, estimateItems, estimateScenarios, jobs, partDefs, filamentOrderHistory
   };
   const blob = new Blob([JSON.stringify(snapshot, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
@@ -4846,6 +4846,7 @@ async function importAllData(jsonText){
   if(Array.isArray(data.estimateItems)) estimateItems = data.estimateItems;
   if(Array.isArray(data.estimateScenarios) && data.estimateScenarios.length>0) estimateScenarios = data.estimateScenarios;
   if(Array.isArray(data.jobs)) jobs = data.jobs;
+  if(Array.isArray(data.filamentOrderHistory)) filamentOrderHistory = data.filamentOrderHistory;
   if(Array.isArray(data.partDefs)){
     partDefs = data.partDefs;
     partDefs.forEach(pd => { if(!Array.isArray(pd.replacementLog)) pd.replacementLog = []; });
@@ -4875,7 +4876,7 @@ async function importAllData(jsonText){
   });
 
   await Promise.all([
-    saveCatalog(), saveTypes(), saveSettings(), savePrinters(), saveSpools(), saveStock(), saveOrder(), saveLog(), saveEstimateItems(), saveEstimateScenarios(), saveJobs(), savePartDefs()
+    saveCatalog(), saveTypes(), saveSettings(), savePrinters(), saveSpools(), saveStock(), saveOrder(), saveLog(), saveEstimateItems(), saveEstimateScenarios(), saveJobs(), savePartDefs(), saveFilamentOrderHistory()
   ]);
   syncConsumption();
 
